@@ -15,7 +15,7 @@ import {
   ServerConfigScreen,
   ThemesScreen,
 } from '../screens';
-import { MiniPlayer, FullPlayer, SongOptionsModal, PlaylistSelectModal } from '../components';
+import { MiniPlayer, FullPlayer, SongOptionsModal, PlaylistSelectModal, AnimatedBackground } from '../components';
 import { useConfigStore, useMusicStore, useThemeStore } from '../store';
 
 // Type definitions
@@ -206,7 +206,12 @@ export const AppNavigator: React.FC = () => {
 
   return (
     <NavigationContainer theme={navTheme}>
-      {currentTheme.flags?.useBackgroundImage ? (
+      {currentTheme.flags?.animatedBackground ? (
+        <View style={styles.container}>
+          <AnimatedBackground {...currentTheme.flags.animatedBackground} />
+          {NavigatorContent}
+        </View>
+      ) : currentTheme.flags?.useBackgroundImage ? (
         <ImageBackground
           source={require('../../assets/fondo.png')}
           style={styles.container}

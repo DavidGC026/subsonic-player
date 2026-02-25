@@ -8,18 +8,27 @@ import {
   RefreshControl,
   ScrollView,
   Image,
+  Alert,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { useMusicStore, useThemeStore, useConfigStore } from '../store';
+import { useMusicStore, useThemeStore, useConfigStore, useDownloadStore } from '../store';
 import { AlbumCard, ArtistCard, SongItem } from '../components';
 import type { Album, Artist, Song } from '../types';
 
-type LibraryTab = 'albums' | 'artists' | 'songs' | 'playlists';
+type LibraryTab = 'albums' | 'artists' | 'songs' | 'playlists' | 'downloads';
 
 interface LibraryScreenProps {
   navigation?: any;
   route?: { params?: { tab?: LibraryTab } };
 }
+
+const formatFileSize = (bytes: number): string => {
+  if (bytes === 0) return '0 B';
+  const k = 1024;
+  const sizes = ['B', 'KB', 'MB', 'GB'];
+  const i = Math.floor(Math.log(bytes) / Math.log(k));
+  return `${parseFloat((bytes / Math.pow(k, i)).toFixed(1))} ${sizes[i]}`;
+};
 
 export const LibraryScreen: React.FC<LibraryScreenProps> = ({ navigation, route }) => {
   const [activeTab, setActiveTab] = useState<LibraryTab>(route?.params?.tab || 'albums');
@@ -38,6 +47,7 @@ export const LibraryScreen: React.FC<LibraryScreenProps> = ({ navigation, route 
     customPlaylistImages,
   } = useMusicStore();
 
+  const { downloadedSongs, removeDownload, removeAllDownloads, getTotalSize } = useDownloadStore();
   const { isConfigured } = useConfigStore();
   const [refreshing, setRefreshing] = useState(false);
   const [songs, setSongs] = useState<Song[]>([]);
@@ -63,6 +73,9 @@ export const LibraryScreen: React.FC<LibraryScreenProps> = ({ navigation, route 
         break;
       case 'songs':
         await loadAllSongs();
+        break;
+      case 'downloads':
+        // Downloads are already in the store, no fetch needed
         break;
     }
   };
@@ -102,6 +115,44 @@ export const LibraryScreen: React.FC<LibraryScreenProps> = ({ navigation, route 
 
   const handleSongPress = (song: Song) => {
     playSong(song, songs);
+  };
+
+  const handleDownloadedSongPress = (song: Song) => {
+    const downloadedList = Object.values(downloadedSongs).map((d) => d.song);
+    playSong(song, downloadedList);
+  };
+
+  const handleRemoveDownload = (songId: string) => {
+    const downloaded = downloadedSongs[songId];
+    if (!downloaded) return;
+
+    Alert.alert(
+      'Eliminar descarga',
+      `¿Eliminar "${downloaded.song.title}" de las descargas?`,
+      [
+        { text: 'Cancelar', style: 'cancel' },
+        {
+          text: 'Eliminar',
+          style: 'destructive',
+          onPress: () => removeDownload(songId),
+        },
+      ]
+    );
+  };
+
+  const handleRemoveAllDownloads = () => {
+    Alert.alert(
+      'Eliminar todas las descargas',
+      '¿Estás seguro de que deseas eliminar todas las canciones descargadas?',
+      [
+        { text: 'Cancelar', style: 'cancel' },
+        {
+          text: 'Eliminar todo',
+          style: 'destructive',
+          onPress: () => removeAllDownloads(),
+        },
+      ]
+    );
   };
 
   const renderTabButton = (tab: LibraryTab, label: string, icon: any) => (
@@ -232,6 +283,77 @@ export const LibraryScreen: React.FC<LibraryScreenProps> = ({ navigation, route 
     />
   );
 
+  const renderDownloads = () => {
+    const downloadedList = Object.values(downloadedSongs);
+    const totalSize = getTotalSize();
+
+    return (
+      <FlatList
+        data={downloadedList}
+        keyExtractor={(item) => item.song.id}
+        contentContainerStyle={styles.listContent}
+        ListHeaderComponent={
+          downloadedList.length > 0 ? (
+            <View style={dlStyles.downloadsHeader}>
+              <View style={dlStyles.downloadsInfo}>
+                <Ionicons name="folder-open" size={20} color={currentTheme.colors.textSecondary} />
+                <Text style={[dlStyles.downloadsSizeText, { color: currentTheme.colors.textSecondary }]}>
+                  {downloadedList.length} canciones • {formatFileSize(totalSize)}
+                </Text>
+              </View>
+              <TouchableOpacity
+                style={[dlStyles.removeAllButton, { borderColor: '#ff6b6b' }]}
+                onPress={handleRemoveAllDownloads}
+              >
+                <Ionicons name="trash-outline" size={16} color="#ff6b6b" />
+                <Text style={dlStyles.removeAllText}>Eliminar todo</Text>
+              </TouchableOpacity>
+            </View>
+          ) : null
+        }
+        renderItem={({ item, index }) => (
+          <View style={dlStyles.downloadItem}>
+            <TouchableOpacity
+              style={dlStyles.downloadItemContent}
+              onPress={() => handleDownloadedSongPress(item.song)}
+              activeOpacity={0.7}
+            >
+              <View style={dlStyles.downloadItemInfo}>
+                <Text style={[dlStyles.downloadItemTitle, { color: currentTheme.colors.text }]} numberOfLines={1}>
+                  {item.song.title}
+                </Text>
+                <Text style={[dlStyles.downloadItemArtist, { color: currentTheme.colors.textSecondary }]} numberOfLines={1}>
+                  {item.song.artist} • {item.song.album}
+                </Text>
+                <Text style={[dlStyles.downloadItemSize, { color: currentTheme.colors.textSecondary }]}>
+                  {formatFileSize(item.fileSize)}
+                </Text>
+              </View>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={dlStyles.downloadItemDelete}
+              onPress={() => handleRemoveDownload(item.song.id)}
+              hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+            >
+              <Ionicons name="close-circle" size={22} color={currentTheme.colors.textSecondary} />
+            </TouchableOpacity>
+          </View>
+        )}
+        ListEmptyComponent={
+          <View style={dlStyles.emptyDownloadsContainer}>
+            <Ionicons name="download-outline" size={64} color={currentTheme.colors.textSecondary} />
+            <Text style={[dlStyles.emptyDownloadsTitle, { color: currentTheme.colors.text }]}>
+              No hay descargas
+            </Text>
+            <Text style={[dlStyles.emptyDownloadsSubtitle, { color: currentTheme.colors.textSecondary }]}>
+              Descarga canciones para escucharlas sin conexión
+            </Text>
+          </View>
+        }
+      />
+    );
+  };
+
   if (!isConfigured) {
     return (
       <View style={[styles.notConfiguredContainer, { backgroundColor: currentTheme.colors.background }]}>
@@ -267,6 +389,7 @@ export const LibraryScreen: React.FC<LibraryScreenProps> = ({ navigation, route 
           {renderTabButton('artists', 'Artistas', 'people')}
           {renderTabButton('songs', 'Canciones', 'musical-notes')}
           {renderTabButton('playlists', 'Playlists', 'list')}
+          {renderTabButton('downloads', 'Descargas', 'download')}
         </ScrollView>
       </View>
 
@@ -276,6 +399,7 @@ export const LibraryScreen: React.FC<LibraryScreenProps> = ({ navigation, route 
         {activeTab === 'artists' && renderArtists()}
         {activeTab === 'songs' && renderSongs()}
         {activeTab === 'playlists' && renderPlaylists()}
+        {activeTab === 'downloads' && renderDownloads()}
       </View>
     </View>
   );
@@ -386,6 +510,82 @@ const styles = StyleSheet.create({
   playlistMeta: {
     fontSize: 14,
     marginTop: 4,
+  },
+});
+
+const dlStyles = StyleSheet.create({
+  downloadsHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    borderBottomWidth: 1,
+    borderBottomColor: '#282828',
+  },
+  downloadsInfo: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  downloadsSizeText: {
+    fontSize: 14,
+  },
+  removeAllButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 16,
+    borderWidth: 1,
+    gap: 4,
+  },
+  removeAllText: {
+    color: '#ff6b6b',
+    fontSize: 12,
+    fontWeight: '600',
+  },
+  downloadItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: 10,
+    paddingHorizontal: 16,
+  },
+  downloadItemContent: {
+    flex: 1,
+  },
+  downloadItemInfo: {
+    flex: 1,
+  },
+  downloadItemTitle: {
+    fontSize: 16,
+    fontWeight: '500',
+  },
+  downloadItemArtist: {
+    fontSize: 14,
+    marginTop: 2,
+  },
+  downloadItemSize: {
+    fontSize: 12,
+    marginTop: 2,
+  },
+  downloadItemDelete: {
+    padding: 8,
+    marginLeft: 8,
+  },
+  emptyDownloadsContainer: {
+    padding: 48,
+    alignItems: 'center',
+  },
+  emptyDownloadsTitle: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    marginTop: 16,
+  },
+  emptyDownloadsSubtitle: {
+    fontSize: 14,
+    textAlign: 'center',
+    marginTop: 8,
   },
 });
 

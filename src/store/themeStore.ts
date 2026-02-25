@@ -15,10 +15,16 @@ export interface Theme {
     };
     flags?: {
         useNyanCatSlider?: boolean;
-        useBlurEffects?: boolean;
         useBackgroundImage?: boolean;
         useGlassmorphism?: boolean;
         useSpicetifyIcons?: boolean;
+        animatedBackground?: {
+            type: 'starry';
+            topColor: string;
+            bottomColor: string;
+            starColor: string;
+        };
+        backgroundImageName?: string;
     };
 }
 
@@ -51,6 +57,168 @@ export const spicetifyCatTheme: Theme = {
         useBackgroundImage: true,
         useGlassmorphism: true,
         useSpicetifyIcons: true,
+        backgroundImageName: 'spicetify-cat',
+    }
+};
+
+export const starryBaseTheme: Theme = {
+    id: 'starry-base',
+    name: 'StarryNight - Base',
+    colors: {
+        primary: '#FFF3C4',
+        background: 'transparent',
+        surface: 'rgba(0, 0, 0, 0.4)',
+        text: '#FFFFFF',
+        textSecondary: '#ADB5BD',
+        black: '#000000',
+    },
+    flags: {
+        useBackgroundImage: false,
+        useGlassmorphism: true,
+        animatedBackground: {
+            type: 'starry',
+            topColor: '#000000',
+            bottomColor: '#142b44',
+            starColor: '#FFFFFF'
+        },
+    }
+};
+
+export const starryCottonCandyTheme: Theme = {
+    id: 'starry-cotton-candy',
+    name: 'StarryNight - Cotton Candy',
+    colors: {
+        primary: '#d3e9ff',
+        background: 'transparent',
+        surface: 'rgba(0, 0, 0, 0.4)',
+        text: '#FFFFFF',
+        textSecondary: '#fff4f4',
+        black: '#000000',
+    },
+    flags: {
+        useBackgroundImage: false,
+        useGlassmorphism: true,
+        animatedBackground: {
+            type: 'starry',
+            topColor: '#ff71b2',
+            bottomColor: '#509be1',
+            starColor: '#FFFFFF'
+        },
+    }
+};
+
+export const starryForestTheme: Theme = {
+    id: 'starry-forest',
+    name: 'StarryNight - Forest',
+    colors: {
+        primary: '#c4c6ff',
+        background: 'transparent',
+        surface: 'rgba(0, 0, 0, 0.4)',
+        text: '#FFFFFF',
+        textSecondary: '#ADB5BD',
+        black: '#000000',
+    },
+    flags: {
+        useBackgroundImage: false,
+        useGlassmorphism: true,
+        animatedBackground: {
+            type: 'starry',
+            topColor: '#000000',
+            bottomColor: '#14442b',
+            starColor: '#FFFFFF'
+        },
+    }
+};
+
+export const starryGalaxyTheme: Theme = {
+    id: 'starry-galaxy',
+    name: 'StarryNight - Galaxy',
+    colors: {
+        primary: '#FFF3C4',
+        background: 'transparent',
+        surface: 'rgba(0, 0, 0, 0.4)',
+        text: '#ffe4f2',
+        textSecondary: '#FFFFFF',
+        black: '#000000',
+    },
+    flags: {
+        useBackgroundImage: false,
+        useGlassmorphism: true,
+        animatedBackground: {
+            type: 'starry',
+            topColor: '#00076f',
+            bottomColor: '#b133c9',
+            starColor: '#FFFFFF'
+        },
+    }
+};
+
+export const starryOrangeTheme: Theme = {
+    id: 'starry-orange',
+    name: 'StarryNight - Orange',
+    colors: {
+        primary: '#fbe39b',
+        background: 'transparent',
+        surface: 'rgba(0, 0, 0, 0.4)',
+        text: '#FFFFFF',
+        textSecondary: '#FFFFFF',
+        black: '#000000',
+    },
+    flags: {
+        useBackgroundImage: false,
+        useGlassmorphism: true,
+        animatedBackground: {
+            type: 'starry',
+            topColor: '#000000',
+            bottomColor: '#e69138',
+            starColor: '#ffe234'
+        },
+    }
+};
+
+export const starrySkyTheme: Theme = {
+    id: 'starry-sky',
+    name: 'StarryNight - Sky',
+    colors: {
+        primary: '#FFF3C4',
+        background: 'transparent',
+        surface: 'rgba(0, 0, 0, 0.4)',
+        text: '#FFFFFF',
+        textSecondary: '#040a18',
+        black: '#000000',
+    },
+    flags: {
+        useBackgroundImage: false,
+        useGlassmorphism: true,
+        animatedBackground: {
+            type: 'starry',
+            topColor: '#1e48a9',
+            bottomColor: '#62cff4',
+            starColor: '#FFFFFF'
+        },
+    }
+};
+
+export const starrySunriseTheme: Theme = {
+    id: 'starry-sunrise',
+    name: 'StarryNight - Sunrise',
+    colors: {
+        primary: '#FFF3C4',
+        background: 'transparent',
+        surface: 'rgba(0, 0, 0, 0.4)',
+        text: '#FFFFFF',
+        textSecondary: '#E0E0E0',
+        black: '#000000',
+    },
+    flags: {
+        useBackgroundImage: false,
+        useGlassmorphism: true,
+        animatedBackground: {
+            type: 'starry',
+            topColor: '#FFAE41',
+            bottomColor: '#F83D41',
+            starColor: '#FFFFFF'
+        },
     }
 };
 
@@ -66,7 +234,17 @@ export const useThemeStore = create<ThemeState>()(
     persist(
         (set, get) => ({
             currentTheme: defaultTheme,
-            installedThemes: [defaultTheme, spicetifyCatTheme],
+            installedThemes: [
+                defaultTheme,
+                spicetifyCatTheme,
+                starryBaseTheme,
+                starryCottonCandyTheme,
+                starryForestTheme,
+                starryGalaxyTheme,
+                starryOrangeTheme,
+                starrySkyTheme,
+                starrySunriseTheme
+            ],
 
             setTheme: (themeId: string) => {
                 const theme = get().installedThemes.find(t => t.id === themeId);

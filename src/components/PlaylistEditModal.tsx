@@ -1,19 +1,22 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, StyleSheet, Modal, TouchableOpacity, TouchableWithoutFeedback, TextInput, Alert, Image } from 'react-native';
+import { View, Text, StyleSheet, Modal, TouchableOpacity, TouchableWithoutFeedback, TextInput, Alert, Image, ActivityIndicator } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import * as ImagePicker from 'expo-image-picker';
-import { useMusicStore } from '../store';
-import type { Playlist } from '../types';
+import { useMusicStore, useDownloadStore } from '../store';
+import type { Playlist, Song } from '../types';
+import { subsonicApi } from '../api/subsonic';
 
 interface Props {
     visible: boolean;
     playlist: Playlist | null;
     onClose: () => void;
     onDeleted?: () => void;
+    songs?: Song[];
 }
 
-export const PlaylistEditModal: React.FC<Props> = ({ visible, playlist, onClose, onDeleted }) => {
+export const PlaylistEditModal: React.FC<Props> = ({ visible, playlist, onClose, onDeleted, songs }) => {
     const { updatePlaylistName, deletePlaylist, setCustomPlaylistImage, customPlaylistImages } = useMusicStore();
+    const { downloadPlaylist, removeDownload, isDownloaded, playlistDownloadProgress, cancelPlaylistDownload } = useDownloadStore();
     const [isEditing, setIsEditing] = useState(false);
     const [newName, setNewName] = useState('');
 
@@ -25,6 +28,12 @@ export const PlaylistEditModal: React.FC<Props> = ({ visible, playlist, onClose,
     }, [visible, playlist]);
 
     if (!playlist) return null;
+
+    const isDownloadingThisPlaylist = playlistDownloadProgress?.playlistId === playlist.id;
+
+    // Check if all songs in the playlist are downloaded
+    const allSongsDownloaded = songs && songs.length > 0 && songs.every((s) => isDownloaded(s.id));
+    const someSongsDownloaded = songs && songs.some((s) => isDownloaded(s.id));
 
     const handleSaveName = async () => {
         if (newName.trim() && newName !== playlist.name) {
@@ -69,6 +78,49 @@ export const PlaylistEditModal: React.FC<Props> = ({ visible, playlist, onClose,
 
     const handleRemoveImage = async () => {
         await setCustomPlaylistImage(playlist.id, null);
+    };
+
+    const handleDownloadPlaylist = async () => {
+        if (!songs || songs.length === 0) {
+            // If songs weren't passed, fetch them
+            try {
+                const { songs: playlistSongs } = await subsonicApi.getPlaylist(playlist.id);
+                onClose();
+                await downloadPlaylist(playlist.id, playlistSongs);
+            } catch (error) {
+                console.error('Error fetching playlist songs for download:', error);
+            }
+        } else {
+            onClose();
+            await downloadPlaylist(playlist.id, songs);
+        }
+    };
+
+    const handleRemovePlaylistDownloads = () => {
+        if (!songs) return;
+        Alert.alert(
+            "Eliminar descargas",
+            `¿Eliminar todas las descargas de "${playlist.name}"?`,
+            [
+                { text: "Cancelar", style: "cancel" },
+                {
+                    text: "Eliminar",
+                    style: "destructive",
+                    onPress: async () => {
+                        for (const song of songs) {
+                            if (isDownloaded(song.id)) {
+                                await removeDownload(song.id);
+                            }
+                        }
+                        onClose();
+                    }
+                }
+            ]
+        );
+    };
+
+    const handleCancelDownload = () => {
+        cancelPlaylistDownload();
     };
 
     const customImage = customPlaylistImages[playlist?.id || ''];
@@ -131,6 +183,33 @@ export const PlaylistEditModal: React.FC<Props> = ({ visible, playlist, onClose,
                                         <TouchableOpacity style={styles.option} onPress={handleRemoveImage}>
                                             <Ionicons name="trash-outline" size={24} color="#ffffff" />
                                             <Text style={styles.optionText}>Quitar imagen personalizada</Text>
+                                        </TouchableOpacity>
+                                    )}
+
+                                    {/* Download playlist options */}
+                                    {isDownloadingThisPlaylist ? (
+                                        <TouchableOpacity style={styles.option} onPress={handleCancelDownload}>
+                                            <ActivityIndicator size={24} color="#1DB954" />
+                                            <View style={styles.downloadProgressContainer}>
+                                                <Text style={[styles.optionText, { color: '#1DB954' }]}>
+                                                    Descargando {playlistDownloadProgress.completed}/{playlistDownloadProgress.total}
+                                                </Text>
+                                                <Text style={styles.downloadProgressSong} numberOfLines={1}>
+                                                    {playlistDownloadProgress.currentSongTitle}
+                                                </Text>
+                                            </View>
+                                        </TouchableOpacity>
+                                    ) : allSongsDownloaded ? (
+                                        <TouchableOpacity style={styles.option} onPress={handleRemovePlaylistDownloads}>
+                                            <Ionicons name="cloud-done" size={24} color="#1DB954" />
+                                            <Text style={[styles.optionText, { color: '#1DB954' }]}>Eliminar descargas de playlist</Text>
+                                        </TouchableOpacity>
+                                    ) : (
+                                        <TouchableOpacity style={styles.option} onPress={handleDownloadPlaylist}>
+                                            <Ionicons name="download-outline" size={24} color="#ffffff" />
+                                            <Text style={styles.optionText}>
+                                                {someSongsDownloaded ? 'Descargar canciones restantes' : 'Descargar playlist'}
+                                            </Text>
                                         </TouchableOpacity>
                                     )}
 
@@ -210,6 +289,15 @@ const styles = StyleSheet.create({
         color: '#B22222',
         fontSize: 16,
         marginLeft: 16,
+    },
+    downloadProgressContainer: {
+        marginLeft: 16,
+        flex: 1,
+    },
+    downloadProgressSong: {
+        color: '#b3b3b3',
+        fontSize: 12,
+        marginTop: 2,
     },
     editContainer: {
         marginTop: 8,

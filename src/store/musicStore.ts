@@ -1,5 +1,11 @@
 import { create } from 'zustand/react';
-import { Audio } from 'expo-av';
+import TrackPlayer, {
+  State,
+  Capability,
+  RepeatMode,
+  Event,
+  AppKilledPlaybackBehavior,
+} from 'react-native-track-player';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import type { Song, Artist, Album, Playlist, SearchResult } from '../types';
 import { subsonicApi } from '../api/subsonic';
@@ -20,7 +26,7 @@ interface PlayerState {
 interface MusicStore {
   // Player state
   player: PlayerState;
-  sound: Audio.Sound | null;
+  isTrackPlayerReady: boolean;
 
   // Library data
   artists: Artist[];
@@ -34,6 +40,7 @@ interface MusicStore {
   isLoadingPlaylists: boolean;
 
   // Actions
+  initTrackPlayer: () => Promise<void>;
   setCurrentSong: (song: Song | null) => void;
   setQueue: (songs: Song[]) => void;
   addToQueue: (song: Song) => void;
@@ -49,6 +56,7 @@ interface MusicStore {
   setVolume: (volume: number) => void;
   loadAndPlaySong: (song: Song) => Promise<void>;
   playSong: (song: Song, queue?: Song[]) => Promise<void>;
+  seekTo: (positionMs: number) => Promise<void>;
 
   // Library actions
   setArtists: (artists: Artist[]) => void;
@@ -81,6 +89,22 @@ interface MusicStore {
   setPlaylistModalSong: (song: Song | null) => void;
 }
 
+/**
+ * Build a Track object for react-native-track-player from a Song and its resolved URI.
+ */
+function buildTrack(song: Song, uri: string) {
+  const artworkUrl = subsonicApi.getCoverArtUrl(song.coverArt, 600);
+  return {
+    id: song.id,
+    url: uri,
+    title: song.title,
+    artist: song.artist,
+    album: song.album,
+    duration: song.duration,
+    artwork: artworkUrl || undefined,
+  };
+}
+
 export const useMusicStore = create<MusicStore>((set, get) => ({
   // Player state
   player: {
@@ -94,7 +118,7 @@ export const useMusicStore = create<MusicStore>((set, get) => ({
     shuffleMode: false,
     volume: 1.0,
   },
-  sound: null,
+  isTrackPlayerReady: false,
 
   // Library data
   artists: [],
@@ -111,6 +135,93 @@ export const useMusicStore = create<MusicStore>((set, get) => ({
   optionsModalSong: null,
   playlistModalSong: null,
 
+  // Initialize TrackPlayer
+  initTrackPlayer: async () => {
+    try {
+      await TrackPlayer.setupPlayer({
+        autoHandleInterruptions: true,
+      });
+
+      await TrackPlayer.updateOptions({
+        android: {
+          appKilledPlaybackBehavior: AppKilledPlaybackBehavior.ContinuePlayback,
+        },
+        capabilities: [
+          Capability.Play,
+          Capability.Pause,
+          Capability.SkipToNext,
+          Capability.SkipToPrevious,
+          Capability.SeekTo,
+          Capability.Stop,
+        ],
+        compactCapabilities: [
+          Capability.Play,
+          Capability.Pause,
+          Capability.SkipToNext,
+        ],
+        notificationCapabilities: [
+          Capability.Play,
+          Capability.Pause,
+          Capability.SkipToNext,
+          Capability.SkipToPrevious,
+          Capability.SeekTo,
+        ],
+        progressUpdateEventInterval: 1,
+      });
+
+      // Listen for playback state changes
+      TrackPlayer.addEventListener(Event.PlaybackState, (event) => {
+        const isPlaying = event.state === State.Playing;
+        set((state) => ({
+          player: { ...state.player, isPlaying },
+        }));
+      });
+
+      // Listen for track changes
+      TrackPlayer.addEventListener(Event.PlaybackActiveTrackChanged, (event) => {
+        if (event.track) {
+          const { player } = get();
+          const songIndex = player.queue.findIndex((s) => s.id === event.track?.id);
+          if (songIndex >= 0) {
+            set((state) => ({
+              player: {
+                ...state.player,
+                currentSong: state.player.queue[songIndex],
+                currentIndex: songIndex,
+              },
+            }));
+          }
+        }
+      });
+
+      // Listen for track ending to handle repeat/shuffle
+      TrackPlayer.addEventListener(Event.PlaybackQueueEnded, async (event) => {
+        const { player } = get();
+        if (player.repeatMode === 'all' && player.queue.length > 0) {
+          // Restart from beginning
+          await TrackPlayer.skip(0);
+          await TrackPlayer.play();
+        }
+      });
+
+      // Listen for progress updates
+      TrackPlayer.addEventListener(Event.PlaybackProgressUpdated, (event) => {
+        set((state) => ({
+          player: {
+            ...state.player,
+            position: (event.position || 0) * 1000, // Convert to ms for UI compatibility
+            duration: (event.duration || 0) * 1000,
+          },
+        }));
+      });
+
+      set({ isTrackPlayerReady: true });
+      console.log('[TrackPlayer] Initialized successfully');
+    } catch (error) {
+      console.error('[TrackPlayer] Setup error:', error);
+    }
+  },
+
   // Player actions
   setCurrentSong: (song: Song | null) => {
     set((state) => ({
@@ -125,6 +236,14 @@ export const useMusicStore = create<MusicStore>((set, get) => ({
   },
 
   addToQueue: (song: Song) => {
+    const addTrackToQueue = async () => {
+      const remoteUrl = subsonicApi.getStreamUrl(song.id);
+      const finalUri = await CacheManager.getPlaybackUri(song, remoteUrl);
+      const track = buildTrack(song, finalUri);
+      await TrackPlayer.add(track);
+    };
+    addTrackToQueue().catch(console.error);
+
     set((state) => ({
       player: { ...state.player, queue: [...state.player.queue, song] },
     }));
@@ -157,7 +276,7 @@ export const useMusicStore = create<MusicStore>((set, get) => ({
   },
 
   playNext: async () => {
-    const { player, sound } = get();
+    const { player } = get();
     const { queue, currentIndex, repeatMode, shuffleMode } = player;
 
     if (queue.length === 0) return;
@@ -173,6 +292,7 @@ export const useMusicStore = create<MusicStore>((set, get) => ({
         if (repeatMode === 'all') {
           nextIndex = 0;
         } else {
+          await TrackPlayer.pause();
           set((state) => ({
             player: { ...state.player, isPlaying: false },
           }));
@@ -182,12 +302,6 @@ export const useMusicStore = create<MusicStore>((set, get) => ({
     }
 
     const nextSong = queue[nextIndex];
-
-    if (sound) {
-      await sound.stopAsync();
-      await sound.unloadAsync();
-    }
-
     set((state) => ({
       player: { ...state.player, currentSong: nextSong, currentIndex: nextIndex },
     }));
@@ -196,7 +310,7 @@ export const useMusicStore = create<MusicStore>((set, get) => ({
   },
 
   playPrevious: async () => {
-    const { player, sound } = get();
+    const { player } = get();
     const { queue, currentIndex, shuffleMode } = player;
 
     if (queue.length === 0) return;
@@ -214,12 +328,6 @@ export const useMusicStore = create<MusicStore>((set, get) => ({
     }
 
     const prevSong = queue[prevIndex];
-
-    if (sound) {
-      await sound.stopAsync();
-      await sound.unloadAsync();
-    }
-
     set((state) => ({
       player: { ...state.player, currentSong: prevSong, currentIndex: prevIndex },
     }));
@@ -228,14 +336,12 @@ export const useMusicStore = create<MusicStore>((set, get) => ({
   },
 
   togglePlay: () => {
-    const { player, sound } = get();
-
-    if (!sound) return;
+    const { player } = get();
 
     if (player.isPlaying) {
-      sound.pauseAsync();
+      TrackPlayer.pause();
     } else {
-      sound.playAsync();
+      TrackPlayer.play();
     }
 
     set((state) => ({
@@ -262,6 +368,10 @@ export const useMusicStore = create<MusicStore>((set, get) => ({
   },
 
   setRepeatMode: (mode: 'none' | 'all' | 'one') => {
+    // Sync with TrackPlayer's repeat mode
+    const tpMode = mode === 'one' ? RepeatMode.Track : mode === 'all' ? RepeatMode.Queue : RepeatMode.Off;
+    TrackPlayer.setRepeatMode(tpMode).catch(console.error);
+
     set((state) => ({
       player: { ...state.player, repeatMode: mode },
     }));
@@ -274,15 +384,16 @@ export const useMusicStore = create<MusicStore>((set, get) => ({
   },
 
   setVolume: (volume: number) => {
-    const { sound } = get();
-
-    if (sound) {
-      sound.setVolumeAsync(volume);
-    }
+    TrackPlayer.setVolume(volume).catch(console.error);
 
     set((state) => ({
       player: { ...state.player, volume },
     }));
+  },
+
+  // Seek to a position in milliseconds
+  seekTo: async (positionMs: number) => {
+    await TrackPlayer.seekTo(positionMs / 1000); // TrackPlayer uses seconds
   },
 
   // Load and play a song
@@ -292,36 +403,14 @@ export const useMusicStore = create<MusicStore>((set, get) => ({
 
       // Use CacheManager: serves local file if cached, remote URL otherwise
       const finalUri = await CacheManager.getPlaybackUri(song, remoteUrl);
+      const track = buildTrack(song, finalUri);
 
-      const { sound: newSound } = await Audio.Sound.createAsync(
-        { uri: finalUri },
-        { shouldPlay: true, volume: get().player.volume },
-        (status) => {
-          if (status.isLoaded) {
-            set((state) => ({
-              player: {
-                ...state.player,
-                position: status.positionMillis || 0,
-                duration: status.durationMillis || 0,
-                isPlaying: status.isPlaying,
-              },
-            }));
+      // Reset the TrackPlayer queue and load the new track
+      await TrackPlayer.reset();
+      await TrackPlayer.add(track);
+      await TrackPlayer.play();
 
-            if (status.didJustFinish) {
-              const { player } = get();
-
-              if (player.repeatMode === 'one') {
-                get().loadAndPlaySong(song);
-              } else {
-                get().playNext();
-              }
-            }
-          }
-        }
-      );
-
-      set({ sound: newSound });
-
+      // Scrobble after a delay
       setTimeout(() => {
         subsonicApi.scrobble(song.id);
       }, Math.min(30000, (song.duration * 1000) / 2));
@@ -333,13 +422,6 @@ export const useMusicStore = create<MusicStore>((set, get) => ({
 
   // Play a song immediately
   playSong: async (song: Song, queue?: Song[]) => {
-    const { sound } = get();
-
-    if (sound) {
-      await sound.stopAsync();
-      await sound.unloadAsync();
-    }
-
     if (queue) {
       const songIndex = queue.findIndex((s) => s.id === song.id);
       set((state) => ({

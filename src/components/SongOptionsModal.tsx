@@ -1,7 +1,7 @@
 import React from 'react';
-import { View, Text, StyleSheet, Modal, TouchableOpacity, TouchableWithoutFeedback } from 'react-native';
+import { View, Text, StyleSheet, Modal, TouchableOpacity, TouchableWithoutFeedback, ActivityIndicator } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { useMusicStore } from '../store';
+import { useMusicStore, useDownloadStore } from '../store';
 import type { Song } from '../types';
 import { AlbumArt } from './AlbumArt';
 
@@ -14,8 +14,12 @@ interface Props {
 
 export const SongOptionsModal: React.FC<Props> = ({ visible, song, onClose, onAddToPlaylist }) => {
     const { addToQueue, player } = useMusicStore();
+    const { downloadSong, removeDownload, isDownloaded, currentDownload } = useDownloadStore();
 
     if (!song) return null;
+
+    const songIsDownloaded = isDownloaded(song.id);
+    const isCurrentlyDownloading = currentDownload?.songId === song.id;
 
     const handlePlayNext = () => {
         // Insert into queue right after current index
@@ -31,6 +35,16 @@ export const SongOptionsModal: React.FC<Props> = ({ visible, song, onClose, onAd
         onClose();
     };
 
+    const handleDownload = async () => {
+        onClose();
+        await downloadSong(song);
+    };
+
+    const handleRemoveDownload = async () => {
+        await removeDownload(song.id);
+        onClose();
+    };
+
     return (
         <Modal visible={visible} transparent animationType="fade" onRequestClose={onClose}>
             <TouchableWithoutFeedback onPress={onClose}>
@@ -43,6 +57,9 @@ export const SongOptionsModal: React.FC<Props> = ({ visible, song, onClose, onAd
                                     <Text style={styles.title} numberOfLines={1}>{song.title}</Text>
                                     <Text style={styles.artist} numberOfLines={1}>{song.artist}</Text>
                                 </View>
+                                {songIsDownloaded && (
+                                    <Ionicons name="checkmark-circle" size={20} color="#1DB954" style={styles.downloadedBadge} />
+                                )}
                             </View>
 
                             <TouchableOpacity style={styles.option} onPress={handlePlayNext}>
@@ -59,6 +76,31 @@ export const SongOptionsModal: React.FC<Props> = ({ visible, song, onClose, onAd
                                 <Ionicons name="add-circle-outline" size={24} color="#b3b3b3" />
                                 <Text style={styles.optionText}>Añadir a playlist</Text>
                             </TouchableOpacity>
+
+                            {songIsDownloaded ? (
+                                <TouchableOpacity style={styles.option} onPress={handleRemoveDownload}>
+                                    <Ionicons name="trash-outline" size={24} color="#ff6b6b" />
+                                    <Text style={[styles.optionText, { color: '#ff6b6b' }]}>Eliminar descarga</Text>
+                                </TouchableOpacity>
+                            ) : (
+                                <TouchableOpacity
+                                    style={styles.option}
+                                    onPress={handleDownload}
+                                    disabled={isCurrentlyDownloading}
+                                >
+                                    {isCurrentlyDownloading ? (
+                                        <>
+                                            <ActivityIndicator size={24} color="#1DB954" />
+                                            <Text style={[styles.optionText, { color: '#1DB954' }]}>Descargando...</Text>
+                                        </>
+                                    ) : (
+                                        <>
+                                            <Ionicons name="download-outline" size={24} color="#b3b3b3" />
+                                            <Text style={styles.optionText}>Descargar</Text>
+                                        </>
+                                    )}
+                                </TouchableOpacity>
+                            )}
                         </View>
                     </TouchableWithoutFeedback>
                 </View>
@@ -101,6 +143,9 @@ const styles = StyleSheet.create({
         color: '#b3b3b3',
         fontSize: 14,
         marginTop: 4,
+    },
+    downloadedBadge: {
+        marginLeft: 8,
     },
     option: {
         flexDirection: 'row',

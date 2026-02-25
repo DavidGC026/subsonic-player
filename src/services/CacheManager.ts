@@ -130,4 +130,28 @@ export const CacheManager = {
         const index = await CacheManager.getIndex();
         return index.length;
     },
+
+    /**
+     * Get the file size of a cached song in bytes.
+     * Returns 0 if the file does not exist.
+     */
+    getFileSize: (songId: string): number => {
+        const file = new File(getCacheDir(), `${songId}.mp3`);
+        if (file.exists) {
+            return file.size;
+        }
+        return 0;
+    },
+
+    /**
+     * Get the local file URI for a cached song.
+     * Returns null if the file does not exist.
+     */
+    getLocalUri: (songId: string): string | null => {
+        const file = new File(getCacheDir(), `${songId}.mp3`);
+        if (file.exists) {
+            return file.uri;
+        }
+        return null;
+    },
 };

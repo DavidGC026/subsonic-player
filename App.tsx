@@ -1,33 +1,26 @@
 import React, { useEffect } from 'react';
 import { StatusBar } from 'expo-status-bar';
 import { View, StyleSheet } from 'react-native';
-import { Audio } from 'expo-av';
+import TrackPlayer from 'react-native-track-player';
 import { AppNavigator } from './src/navigation';
 import { CacheManager } from './src/services/CacheManager';
+import { PlaybackService } from './src/services/PlaybackService';
+import { useDownloadStore, useMusicStore } from './src/store';
+
+// Register the playback service — must be called at module level
+TrackPlayer.registerPlaybackService(() => PlaybackService);
 
 export default function App() {
   useEffect(() => {
-    // Configure audio session
-    const configureAudio = async () => {
-      try {
-        await Audio.setAudioModeAsync({
-          allowsRecordingIOS: false,
-          staysActiveInBackground: true,
-          playsInSilentModeIOS: true,
-          shouldDuckAndroid: true,
-          playThroughEarpieceAndroid: false,
-        });
-      } catch (error) {
-        console.error('Error configuring audio:', error);
-      }
-    };
+    // Initialize TrackPlayer
+    useMusicStore.getState().initTrackPlayer();
 
-    configureAudio();
-
-    // Initialize music cache directory
-    CacheManager.init().catch((error) => {
-      console.error('Error initializing cache:', error);
-    });
+    // Initialize music cache directory and load downloads
+    CacheManager.init()
+      .then(() => useDownloadStore.getState().loadDownloads())
+      .catch((error) => {
+        console.error('Error initializing cache:', error);
+      });
   }, []);
 
   return (

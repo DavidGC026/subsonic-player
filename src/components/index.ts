@@ -9,3 +9,4 @@ export { SongOptionsModal } from './SongOptionsModal';
 export { PlaylistSelectModal } from './PlaylistSelectModal';
 export { PlaylistEditModal } from './PlaylistEditModal';
 export * from './ThemeIcon';
+export { AnimatedBackground } from './AnimatedBackground';

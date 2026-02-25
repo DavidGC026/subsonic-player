@@ -3,7 +3,7 @@ import { View, Text, TouchableOpacity, StyleSheet } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { AlbumArt } from './AlbumArt';
 import type { Song } from '../types';
-import { useMusicStore, useThemeStore } from '../store';
+import { useMusicStore, useThemeStore, useDownloadStore } from '../store';
 
 interface SongItemProps {
   song: Song;
@@ -29,6 +29,10 @@ export const SongItem: React.FC<SongItemProps> = ({
   index,
 }) => {
   const { currentTheme } = useThemeStore();
+  const { isDownloaded, currentDownload } = useDownloadStore();
+
+  const songIsDownloaded = isDownloaded(song.id);
+  const isCurrentlyDownloading = currentDownload?.songId === song.id;
 
   const handlePress = () => {
     onPress?.(song);
@@ -72,13 +76,21 @@ export const SongItem: React.FC<SongItemProps> = ({
       )}
 
       <View style={styles.info}>
-        <Text
-          style={[styles.title, { color: currentTheme.colors.text }, isPlaying && { color: currentTheme.colors.primary }]}
-          numberOfLines={1}
-          ellipsizeMode="tail"
-        >
-          {song.title}
-        </Text>
+        <View style={styles.titleRow}>
+          <Text
+            style={[styles.title, { color: currentTheme.colors.text }, isPlaying && { color: currentTheme.colors.primary }]}
+            numberOfLines={1}
+            ellipsizeMode="tail"
+          >
+            {song.title}
+          </Text>
+          {songIsDownloaded && (
+            <Ionicons name="arrow-down-circle" size={14} color="#1DB954" style={styles.downloadedIcon} />
+          )}
+          {isCurrentlyDownloading && (
+            <Ionicons name="cloud-download-outline" size={14} color={currentTheme.colors.textSecondary} style={styles.downloadedIcon} />
+          )}
+        </View>
         <Text style={[styles.artist, { color: currentTheme.colors.textSecondary }]} numberOfLines={1} ellipsizeMode="tail">
           {song.artist}
         </Text>
@@ -135,10 +147,18 @@ const styles = StyleSheet.create({
     flex: 1,
     marginLeft: 12,
   },
+  titleRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
   title: {
     color: '#ffffff',
     fontSize: 16,
     fontWeight: '500',
+    flexShrink: 1,
+  },
+  downloadedIcon: {
+    marginLeft: 6,
   },
   playingTitle: {
     color: '#B22222',

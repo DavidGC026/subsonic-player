@@ -153,6 +153,7 @@ export const PlaylistDetailScreen: React.FC<PlaylistDetailScreenProps> = ({ navi
             <PlaylistEditModal
                 visible={isEditModalVisible}
                 playlist={playlist}
+                songs={songs}
                 onClose={() => {
                     setIsEditModalVisible(false);
                     loadPlaylistDetails(); // Refresh details after possible rename

@@ -13,6 +13,7 @@ import { CustomSlider } from './CustomSlider';
 import { useMusicStore, useThemeStore } from '../store';
 import { AlbumArt } from './AlbumArt';
 import { ThemeIcon } from './ThemeIcon';
+import { AnimatedBackground } from './AnimatedBackground';
 
 const { width: screenWidth, height: screenHeight } = Dimensions.get('window');
 
@@ -36,7 +37,7 @@ export const FullPlayer: React.FC<FullPlayerProps> = ({ onClose }) => {
     setRepeatMode,
     toggleShuffle,
     setVolume,
-    sound,
+    seekTo,
     playSong,
   } = useMusicStore();
 
@@ -47,11 +48,9 @@ export const FullPlayer: React.FC<FullPlayerProps> = ({ onClose }) => {
   const { currentTheme } = useThemeStore();
 
   const handleSeek = useCallback(async (value: number) => {
-    if (sound) {
-      await sound.setPositionAsync(value);
-      setIsSeeking(false);
-    }
-  }, [sound]);
+    await seekTo(value);
+    setIsSeeking(false);
+  }, [seekTo]);
 
   const handleSlidingStart = useCallback((value: number) => {
     setIsSeeking(true);
@@ -77,7 +76,9 @@ export const FullPlayer: React.FC<FullPlayerProps> = ({ onClose }) => {
     <View style={[styles.container, { backgroundColor: currentTheme.colors.background }]}>
       {/* Background */}
       <View style={styles.background}>
-        {currentTheme.flags?.useBackgroundImage ? (
+        {currentTheme.flags?.animatedBackground ? (
+          <AnimatedBackground {...currentTheme.flags.animatedBackground} />
+        ) : currentTheme.flags?.useBackgroundImage ? (
           <ImageBackground
             source={require('../../assets/fondo.png')}
             style={StyleSheet.absoluteFill}
