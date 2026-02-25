@@ -3,6 +3,7 @@ import { Audio } from 'expo-av';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import type { Song, Artist, Album, Playlist, SearchResult } from '../types';
 import { subsonicApi } from '../api/subsonic';
+import { CacheManager } from '../services/CacheManager';
 
 interface PlayerState {
   currentSong: Song | null;
@@ -287,10 +288,13 @@ export const useMusicStore = create<MusicStore>((set, get) => ({
   // Load and play a song
   loadAndPlaySong: async (song: Song) => {
     try {
-      const streamUrl = subsonicApi.getStreamUrl(song.id);
+      const remoteUrl = subsonicApi.getStreamUrl(song.id);
+
+      // Use CacheManager: serves local file if cached, remote URL otherwise
+      const finalUri = await CacheManager.getPlaybackUri(song, remoteUrl);
 
       const { sound: newSound } = await Audio.Sound.createAsync(
-        { uri: streamUrl },
+        { uri: finalUri },
         { shouldPlay: true, volume: get().player.volume },
         (status) => {
           if (status.isLoaded) {

@@ -3,6 +3,7 @@ import { StatusBar } from 'expo-status-bar';
 import { View, StyleSheet } from 'react-native';
 import { Audio } from 'expo-av';
 import { AppNavigator } from './src/navigation';
+import { CacheManager } from './src/services/CacheManager';
 
 export default function App() {
   useEffect(() => {
@@ -22,6 +23,11 @@ export default function App() {
     };
 
     configureAudio();
+
+    // Initialize music cache directory
+    CacheManager.init().catch((error) => {
+      console.error('Error initializing cache:', error);
+    });
   }, []);
 
   return (
