@@ -16,7 +16,8 @@ const gridItemWidth = (screenWidth - 32 - 36) / 3;
 import { Ionicons } from '@expo/vector-icons';
 import { useMusicStore, useConfigStore, useThemeStore } from '../store';
 import { AlbumCard, ArtistCard } from '../components';
-import type { Album, Artist } from '../types';
+import type { Album, Artist, Playlist } from '../types';
+import { subsonicApi } from '../api/subsonic';
 
 interface HomeScreenProps {
   navigation?: any;
@@ -26,15 +27,19 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
   const {
     albums,
     artists,
+    playlists,
     isLoadingAlbums,
     isLoadingArtists,
     fetchAlbums,
     fetchArtists,
+    fetchPlaylists,
     playSong,
+    customPlaylistImages,
   } = useMusicStore();
 
   const { isConfigured } = useConfigStore();
   const [refreshing, setRefreshing] = React.useState(false);
+  const [frequentAlbums, setFrequentAlbums] = React.useState<Album[]>([]);
   const { currentTheme } = useThemeStore();
 
   useEffect(() => {
@@ -47,7 +52,18 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
     await Promise.all([
       fetchAlbums(),
       fetchArtists(),
+      fetchPlaylists(),
+      loadFrequentAlbums(),
     ]);
+  };
+
+  const loadFrequentAlbums = async () => {
+    try {
+      const frequent = await subsonicApi.getAlbums('frequent', 10);
+      setFrequentAlbums(frequent);
+    } catch (error) {
+      console.error('Error loading frequent albums:', error);
+    }
   };
 
   const onRefresh = useCallback(async () => {
@@ -62,6 +78,10 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
 
   const handleArtistPress = (artist: Artist) => {
     navigation?.navigate('ArtistDetail', { artistId: artist.id, artistName: artist.name });
+  };
+
+  const handlePlaylistPress = (playlist: Playlist) => {
+    navigation?.navigate('PlaylistDetail', { playlistId: playlist.id, playlistName: playlist.name });
   };
 
   const handleQuickPlay = async () => {
@@ -218,6 +238,74 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
         </ScrollView>
       </View>
 
+      {/* Most Played Albums */}
+      {frequentAlbums.length > 0 && (
+        <View style={styles.section}>
+          <View style={styles.sectionHeader}>
+            <Text style={[styles.sectionTitle, { color: currentTheme.colors.text }]}>Más Reproducidos</Text>
+          </View>
+
+          <ScrollView
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            contentContainerStyle={styles.horizontalList}
+          >
+            {frequentAlbums.map((album, index) => (
+              <AlbumCard
+                key={`freq-${album.id}-${index}`}
+                album={album}
+                onPress={handleAlbumPress}
+                size={150}
+              />
+            ))}
+          </ScrollView>
+        </View>
+      )}
+
+      {/* Playlists */}
+      {playlists.length > 0 && (
+        <View style={styles.section}>
+          <View style={styles.sectionHeader}>
+            <Text style={[styles.sectionTitle, { color: currentTheme.colors.text }]}>Tus Playlists</Text>
+            <TouchableOpacity onPress={() => navigation?.navigate('Library', { tab: 'playlists' })}>
+              <Text style={[styles.seeAll, { color: currentTheme.colors.textSecondary }]}>Ver todo</Text>
+            </TouchableOpacity>
+          </View>
+
+          <ScrollView
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            contentContainerStyle={styles.horizontalList}
+          >
+            {playlists.slice(0, 8).map((playlist, index) => (
+              <TouchableOpacity
+                key={`pl-${playlist.id}-${index}`}
+                style={[styles.playlistCard, { backgroundColor: currentTheme.colors.surface }]}
+                onPress={() => handlePlaylistPress(playlist)}
+                activeOpacity={0.7}
+              >
+                {customPlaylistImages[playlist.id] ? (
+                  <Image
+                    source={{ uri: customPlaylistImages[playlist.id] }}
+                    style={styles.playlistCardImage}
+                  />
+                ) : (
+                  <View style={[styles.playlistCardIcon, { backgroundColor: currentTheme.colors.background }]}>
+                    <Ionicons name="musical-notes" size={28} color={currentTheme.colors.textSecondary} />
+                  </View>
+                )}
+                <Text style={[styles.playlistCardName, { color: currentTheme.colors.text }]} numberOfLines={1}>
+                  {playlist.name}
+                </Text>
+                <Text style={[styles.playlistCardMeta, { color: currentTheme.colors.textSecondary }]}>
+                  {playlist.songCount} canciones
+                </Text>
+              </TouchableOpacity>
+            ))}
+          </ScrollView>
+        </View>
+      )}
+
       {/* More Albums Grid */}
       <View style={styles.section}>
         <Text style={[styles.sectionTitle, { color: currentTheme.colors.text, paddingHorizontal: 16, marginBottom: 16 }]}>Más Álbumes</Text>
@@ -349,6 +437,33 @@ const styles = StyleSheet.create({
   },
   bottomPadding: {
     height: 100,
+  },
+  playlistCard: {
+    width: 140,
+    marginRight: 12,
+    borderRadius: 8,
+    overflow: 'hidden',
+  },
+  playlistCardImage: {
+    width: 140,
+    height: 140,
+    borderRadius: 8,
+  },
+  playlistCardIcon: {
+    width: 140,
+    height: 140,
+    borderRadius: 8,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  playlistCardName: {
+    fontSize: 13,
+    fontWeight: '600',
+    marginTop: 8,
+  },
+  playlistCardMeta: {
+    fontSize: 11,
+    marginTop: 2,
   },
 });
 

@@ -9,7 +9,7 @@ interface ArtistCardProps {
   size?: number;
 }
 
-export const ArtistCard: React.FC<ArtistCardProps> = ({
+export const ArtistCard: React.FC<ArtistCardProps> = React.memo(({
   artist,
   onPress,
   size = 130,
@@ -42,7 +42,7 @@ export const ArtistCard: React.FC<ArtistCardProps> = ({
       </View>
     </TouchableOpacity>
   );
-};
+}, (prev, next) => prev.artist.id === next.artist.id && prev.size === next.size);
 
 const styles = StyleSheet.create({
   container: {

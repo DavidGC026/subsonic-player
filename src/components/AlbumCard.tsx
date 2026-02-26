@@ -9,7 +9,7 @@ interface AlbumCardProps {
   size?: number;
 }
 
-export const AlbumCard: React.FC<AlbumCardProps> = ({
+export const AlbumCard: React.FC<AlbumCardProps> = React.memo(({
   album,
   onPress,
   size = 130,
@@ -39,7 +39,7 @@ export const AlbumCard: React.FC<AlbumCardProps> = ({
       </View>
     </TouchableOpacity>
   );
-};
+}, (prev, next) => prev.album.id === next.album.id && prev.size === next.size);
 
 const styles = StyleSheet.create({
   container: {

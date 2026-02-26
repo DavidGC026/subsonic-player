@@ -6,11 +6,13 @@ import {
   StyleSheet,
   TouchableOpacity,
   Dimensions,
+  Alert,
+  ActivityIndicator,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { useMusicStore, useThemeStore } from '../store';
+import { useMusicStore, useThemeStore, useModalStore } from '../store';
 import { AlbumArt, AlbumCard } from '../components';
-import type { Album, Artist } from '../types';
+import type { Album, Artist, Song } from '../types';
 import { subsonicApi } from '../api/subsonic';
 
 const { width: screenWidth } = Dimensions.get('window');
@@ -27,8 +29,11 @@ export const ArtistDetailScreen: React.FC<ArtistDetailScreenProps> = ({ navigati
   const [artist, setArtist] = useState<Artist | null>(null);
   const [albums, setAlbums] = useState<Album[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [showOptionsMenu, setShowOptionsMenu] = useState(false);
+  const [isLoadingAllSongs, setIsLoadingAllSongs] = useState(false);
 
-  const { playSong } = useMusicStore();
+  const { playSong, addToQueue } = useMusicStore();
+  const setPlaylistModalSongs = useModalStore(state => state.setPlaylistModalSongs);
   const { currentTheme } = useThemeStore();
 
   useEffect(() => {
@@ -87,6 +92,40 @@ export const ArtistDetailScreen: React.FC<ArtistDetailScreenProps> = ({ navigati
     navigation?.navigate('AlbumDetail', { albumId: album.id, albumName: album.name });
   };
 
+  // Gather all songs from all albums of this artist
+  const getAllArtistSongs = async (): Promise<Song[]> => {
+    const allSongs: Song[] = [];
+    for (const album of albums) {
+      try {
+        const { songs } = await subsonicApi.getAlbum(album.id);
+        allSongs.push(...songs);
+      } catch (error) {
+        console.error('Error loading album songs:', error);
+      }
+    }
+    return allSongs;
+  };
+
+  const handleAddArtistToQueue = async () => {
+    setShowOptionsMenu(false);
+    setIsLoadingAllSongs(true);
+    const allSongs = await getAllArtistSongs();
+    allSongs.forEach(song => addToQueue(song));
+    setIsLoadingAllSongs(false);
+  };
+
+  const handleAddArtistToPlaylist = async () => {
+    setShowOptionsMenu(false);
+    setIsLoadingAllSongs(true);
+    const allSongs = await getAllArtistSongs();
+    setIsLoadingAllSongs(false);
+    if (allSongs.length > 0) {
+      setPlaylistModalSongs(allSongs);
+    } else {
+      Alert.alert('Sin canciones', 'No se encontraron canciones de este artista.');
+    }
+  };
+
   if (isLoading) {
     return (
       <View style={[styles.loadingContainer, { backgroundColor: currentTheme.colors.background }]}>
@@ -112,6 +151,33 @@ export const ArtistDetailScreen: React.FC<ArtistDetailScreenProps> = ({ navigati
             >
               <Ionicons name="arrow-back" size={28} color={currentTheme.colors.text} />
             </TouchableOpacity>
+
+            {/* Options Button */}
+            <TouchableOpacity
+              style={styles.optionsButton}
+              onPress={() => setShowOptionsMenu(!showOptionsMenu)}
+            >
+              <Ionicons name="ellipsis-vertical" size={28} color={currentTheme.colors.text} />
+            </TouchableOpacity>
+
+            {showOptionsMenu && (
+              <View style={[styles.optionsMenu, { backgroundColor: currentTheme.colors.surface }]}>
+                <TouchableOpacity style={styles.menuItem} onPress={handleAddArtistToQueue}>
+                  <Ionicons name="list" size={20} color={currentTheme.colors.text} />
+                  <Text style={[styles.menuItemText, { color: currentTheme.colors.text }]}>Añadir a la cola</Text>
+                </TouchableOpacity>
+                <TouchableOpacity style={styles.menuItem} onPress={handleAddArtistToPlaylist}>
+                  <Ionicons name="add-circle-outline" size={20} color={currentTheme.colors.text} />
+                  <Text style={[styles.menuItemText, { color: currentTheme.colors.text }]}>Añadir a playlist</Text>
+                </TouchableOpacity>
+              </View>
+            )}
+
+            {isLoadingAllSongs && (
+              <View style={styles.loadingOverlay}>
+                <ActivityIndicator size="small" color={currentTheme.colors.primary} />
+              </View>
+            )}
 
             {/* Artist Art */}
             <View style={styles.artContainer}>
@@ -200,6 +266,43 @@ const styles = StyleSheet.create({
     position: 'absolute',
     top: 60,
     left: 16,
+    zIndex: 10,
+    padding: 8,
+  },
+  optionsButton: {
+    position: 'absolute',
+    top: 60,
+    right: 16,
+    zIndex: 10,
+    padding: 8,
+  },
+  optionsMenu: {
+    position: 'absolute',
+    top: 100,
+    right: 16,
+    zIndex: 20,
+    borderRadius: 8,
+    padding: 8,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.25,
+    shadowRadius: 3.84,
+    elevation: 5,
+  },
+  menuItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: 12,
+    paddingHorizontal: 16,
+    gap: 12,
+  },
+  menuItemText: {
+    fontSize: 16,
+  },
+  loadingOverlay: {
+    position: 'absolute',
+    top: 60,
+    right: 56,
     zIndex: 10,
     padding: 8,
   },
