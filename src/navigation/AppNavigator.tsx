@@ -106,8 +106,8 @@ export const AppNavigator: React.FC = () => {
     player,
     optionsModalSong,
     setOptionsModalSong,
-    playlistModalSong,
-    setPlaylistModalSong,
+    playlistModalSongs,
+    setPlaylistModalSongs,
   } = useMusicStore();
   const { currentTheme } = useThemeStore();
 
@@ -183,15 +183,15 @@ export const AppNavigator: React.FC = () => {
         song={optionsModalSong}
         onClose={() => setOptionsModalSong(null)}
         onAddToPlaylist={() => {
-          setPlaylistModalSong(optionsModalSong);
+          setPlaylistModalSongs(optionsModalSong ? [optionsModalSong] : null);
           setOptionsModalSong(null);
         }}
       />
 
       <PlaylistSelectModal
-        visible={!!playlistModalSong}
-        song={playlistModalSong}
-        onClose={() => setPlaylistModalSong(null)}
+        visible={!!playlistModalSongs}
+        songs={playlistModalSongs}
+        onClose={() => setPlaylistModalSongs(null)}
       />
     </>
   );

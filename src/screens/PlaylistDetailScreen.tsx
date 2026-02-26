@@ -6,10 +6,11 @@ import {
     StyleSheet,
     TouchableOpacity,
     Image,
+    Alert,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useMusicStore, useThemeStore } from '../store';
-import { SongItem, PlaylistEditModal } from '../components';
+import { SongItem, PlaylistEditModal, PlaylistAddSongsModal } from '../components';
 import type { Song, Playlist } from '../types';
 import { subsonicApi } from '../api/subsonic';
 
@@ -26,8 +27,9 @@ export const PlaylistDetailScreen: React.FC<PlaylistDetailScreenProps> = ({ navi
     const [songs, setSongs] = useState<Song[]>([]);
     const [isLoading, setIsLoading] = useState(true);
     const [isEditModalVisible, setIsEditModalVisible] = useState(false);
+    const [isAddSongsModalVisible, setIsAddSongsModalVisible] = useState(false);
 
-    const { playSong, customPlaylistImages } = useMusicStore();
+    const { playSong, customPlaylistImages, removeSongFromPlaylist, setOptionsModalSong } = useMusicStore();
     const { currentTheme } = useThemeStore();
 
     useEffect(() => {
@@ -75,6 +77,56 @@ export const PlaylistDetailScreen: React.FC<PlaylistDetailScreenProps> = ({ navi
             return `${hours}h ${remainingMins}m`;
         }
         return `${mins} min`;
+    };
+
+    const handleRemoveFromPlaylist = (song: Song, index: number) => {
+        // Native Alert to confirm
+        Alert.alert(
+            "Eliminar de la playlist",
+            `¿Estás seguro de que deseas eliminar "${song.title}" de la playlist?`,
+            [
+                { text: "Cancelar", style: "cancel" },
+                {
+                    text: "Eliminar",
+                    style: "destructive",
+                    onPress: async () => {
+                        if (playlistId) {
+                            await removeSongFromPlaylist(playlistId, index);
+                            loadPlaylistDetails();
+                        }
+                    }
+                }
+            ]
+        );
+    };
+
+    const handleSongOptions = (song: Song, index: number) => {
+        // We can show an ActionSheet in iOS/Android, or use a custom modal
+        // Since we already have SongOptionsModal but it's global, we can use Alert for quick actions
+        // Or if we want to integrate with standard UI, we can use a local state for the modal.
+        // The simplest and most native react-native way without extra packages is Alert ActionSheet or simple Alert
+        Alert.alert(
+            "Opciones de Canción",
+            `${song.title} - ${song.artist}`,
+            [
+                {
+                    text: "Añadir a la cola",
+                    onPress: () => {
+                        useMusicStore.getState().addToQueue(song);
+                    }
+                },
+                {
+                    text: "Eliminar de la playlist",
+                    style: "destructive",
+                    onPress: () => handleRemoveFromPlaylist(song, index)
+                },
+                {
+                    text: "Más opciones",
+                    onPress: () => setOptionsModalSong(song)
+                },
+                { text: "Cancelar", style: "cancel" }
+            ]
+        );
     };
 
     if (isLoading) {
@@ -145,6 +197,7 @@ export const PlaylistDetailScreen: React.FC<PlaylistDetailScreenProps> = ({ navi
                     <SongItem
                         song={item}
                         onPress={handleSongPress}
+                        onOptionsPress={() => handleSongOptions(item, index)}
                         showArt={true}
                         index={index}
                     />
@@ -161,7 +214,20 @@ export const PlaylistDetailScreen: React.FC<PlaylistDetailScreenProps> = ({ navi
                 onDeleted={() => {
                     navigation?.goBack();
                 }}
+                onAddSongs={() => {
+                    setIsAddSongsModalVisible(true);
+                }}
             />
+            {playlistId && (
+                <PlaylistAddSongsModal
+                    visible={isAddSongsModalVisible}
+                    playlistId={playlistId}
+                    onClose={() => {
+                        setIsAddSongsModalVisible(false);
+                        loadPlaylistDetails(); // Refresh to show newly added songs
+                    }}
+                />
+            )}
         </View>
     );
 };

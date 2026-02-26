@@ -11,10 +11,11 @@ interface Props {
     playlist: Playlist | null;
     onClose: () => void;
     onDeleted?: () => void;
+    onAddSongs?: () => void;
     songs?: Song[];
 }
 
-export const PlaylistEditModal: React.FC<Props> = ({ visible, playlist, onClose, onDeleted, songs }) => {
+export const PlaylistEditModal: React.FC<Props> = ({ visible, playlist, onClose, onDeleted, onAddSongs, songs }) => {
     const { updatePlaylistName, deletePlaylist, setCustomPlaylistImage, customPlaylistImages } = useMusicStore();
     const { downloadPlaylist, removeDownload, isDownloaded, playlistDownloadProgress, cancelPlaylistDownload } = useDownloadStore();
     const [isEditing, setIsEditing] = useState(false);
@@ -177,6 +178,17 @@ export const PlaylistEditModal: React.FC<Props> = ({ visible, playlist, onClose,
                                     <TouchableOpacity style={styles.option} onPress={handlePickImage}>
                                         <Ionicons name="image" size={24} color="#ffffff" />
                                         <Text style={styles.optionText}>Cambiar imagen de portada</Text>
+                                    </TouchableOpacity>
+
+                                    {/* Add songs custom option */}
+                                    <TouchableOpacity style={styles.option} onPress={() => {
+                                        if (onAddSongs) {
+                                            onClose();
+                                            onAddSongs();
+                                        }
+                                    }}>
+                                        <Ionicons name="add-circle-outline" size={24} color="#ffffff" />
+                                        <Text style={styles.optionText}>Añadir canciones</Text>
                                     </TouchableOpacity>
 
                                     {customImage && (

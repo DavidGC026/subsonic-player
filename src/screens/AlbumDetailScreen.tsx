@@ -30,8 +30,9 @@ export const AlbumDetailScreen: React.FC<AlbumDetailScreenProps> = ({ navigation
   const [songs, setSongs] = useState<Song[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [showOptionsMenu, setShowOptionsMenu] = useState(false);
 
-  const { playSong, addToQueue } = useMusicStore();
+  const { playSong, addToQueue, setPlaylistModalSongs } = useMusicStore();
   const { currentTheme } = useThemeStore();
 
   useEffect(() => {
@@ -74,6 +75,18 @@ export const AlbumDetailScreen: React.FC<AlbumDetailScreenProps> = ({ navigation
 
   const handleAddToQueue = (song: Song) => {
     addToQueue(song);
+  };
+
+  const handleAddAlbumToQueue = () => {
+    songs.forEach(song => addToQueue(song));
+    setShowOptionsMenu(false);
+  };
+
+  const handleAddAlbumToPlaylist = () => {
+    if (songs.length > 0) {
+      setPlaylistModalSongs(songs);
+    }
+    setShowOptionsMenu(false);
   };
 
   const formatDuration = (seconds: number): string => {
@@ -121,6 +134,27 @@ export const AlbumDetailScreen: React.FC<AlbumDetailScreenProps> = ({ navigation
         >
           <Ionicons name="arrow-back" size={28} color={currentTheme.colors.text} />
         </TouchableOpacity>
+
+        {/* Options Button */}
+        <TouchableOpacity
+          style={styles.optionsButton}
+          onPress={() => setShowOptionsMenu(!showOptionsMenu)}
+        >
+          <Ionicons name="ellipsis-vertical" size={28} color={currentTheme.colors.text} />
+        </TouchableOpacity>
+
+        {showOptionsMenu && (
+          <View style={[styles.optionsMenu, { backgroundColor: currentTheme.colors.surface }]}>
+            <TouchableOpacity style={styles.menuItem} onPress={handleAddAlbumToQueue}>
+              <Ionicons name="list" size={20} color={currentTheme.colors.text} />
+              <Text style={[styles.menuItemText, { color: currentTheme.colors.text }]}>Añadir a la cola</Text>
+            </TouchableOpacity>
+            <TouchableOpacity style={styles.menuItem} onPress={handleAddAlbumToPlaylist}>
+              <Ionicons name="add-circle-outline" size={20} color={currentTheme.colors.text} />
+              <Text style={[styles.menuItemText, { color: currentTheme.colors.text }]}>Añadir a playlist</Text>
+            </TouchableOpacity>
+          </View>
+        )}
 
         {/* Album Art */}
         <View style={styles.artContainer}>
@@ -254,6 +288,36 @@ const styles = StyleSheet.create({
     left: 16,
     zIndex: 10,
     padding: 8,
+  },
+  optionsButton: {
+    position: 'absolute',
+    top: 60,
+    right: 16,
+    zIndex: 10,
+    padding: 8,
+  },
+  optionsMenu: {
+    position: 'absolute',
+    top: 100,
+    right: 16,
+    zIndex: 20,
+    borderRadius: 8,
+    padding: 8,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.25,
+    shadowRadius: 3.84,
+    elevation: 5,
+  },
+  menuItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: 12,
+    paddingHorizontal: 16,
+    gap: 12,
+  },
+  menuItemText: {
+    fontSize: 16,
   },
   artContainer: {
     alignItems: 'center',

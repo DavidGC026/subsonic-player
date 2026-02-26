@@ -58,7 +58,7 @@ class SubsonicAPI {
 
   private async request<T>(
     endpoint: string,
-    params: Record<string, string | number | undefined> = {}
+    params: Record<string, string | number | string[] | number[] | undefined> = {}
   ): Promise<T> {
     if (!this.config) {
       throw new Error('Server not configured');
@@ -71,8 +71,17 @@ class SubsonicAPI {
       c: 'subsonic-player',
       f: 'json',
       ...Object.fromEntries(
-        Object.entries(params).filter(([_, v]) => v !== undefined).map(([k, v]) => [k, String(v)])
+        Object.entries(params)
+          .filter(([_, v]) => v !== undefined && !Array.isArray(v))
+          .map(([k, v]) => [k, String(v)])
       ),
+    });
+
+    // Add array parameters (like songIdToAdd or songIndexToRemove)
+    Object.entries(params).forEach(([k, v]) => {
+      if (Array.isArray(v)) {
+        v.forEach(val => queryParams.append(k, String(val)));
+      }
     });
 
     const url = `${this.config.url}/rest/${endpoint}?${queryParams.toString()}`;
@@ -218,12 +227,19 @@ class SubsonicAPI {
   }
 
   // Update playlist
-  async updatePlaylist(playlistId: string, songIdToAdd?: string, name?: string, comment?: string): Promise<void> {
-    const params: Record<string, string> = { playlistId };
+  async updatePlaylist(
+    playlistId: string,
+    songIdToAdd?: string | string[],
+    name?: string,
+    comment?: string,
+    songIndexToRemove?: number | number[]
+  ): Promise<void> {
+    const params: Record<string, string | string[] | number | number[]> = { playlistId };
 
-    if (songIdToAdd) params.songIdToAdd = songIdToAdd;
+    if (songIdToAdd !== undefined) params.songIdToAdd = songIdToAdd;
     if (name) params.name = name;
     if (comment) params.comment = comment;
+    if (songIndexToRemove !== undefined) params.songIndexToRemove = songIndexToRemove;
 
     await this.request('updatePlaylist', params);
   }

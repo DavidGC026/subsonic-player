@@ -76,6 +76,8 @@ interface MusicStore {
   deletePlaylist: (playlistId: string) => Promise<void>;
   updatePlaylistName: (playlistId: string, newName: string) => Promise<void>;
   addSongToPlaylist: (playlistId: string, songId: string) => Promise<void>;
+  addSongsToPlaylist: (playlistId: string, songIds: string[]) => Promise<void>;
+  removeSongFromPlaylist: (playlistId: string, songIndex: number) => Promise<void>;
   setCustomPlaylistImage: (playlistId: string, uri: string | null) => Promise<void>;
   loadCustomPlaylistImages: () => Promise<void>;
 
@@ -84,9 +86,9 @@ interface MusicStore {
 
   // Modal states
   optionsModalSong: Song | null;
-  playlistModalSong: Song | null;
+  playlistModalSongs: Song[] | null;
   setOptionsModalSong: (song: Song | null) => void;
-  setPlaylistModalSong: (song: Song | null) => void;
+  setPlaylistModalSongs: (songs: Song[] | null) => void;
 }
 
 /**
@@ -133,7 +135,7 @@ export const useMusicStore = create<MusicStore>((set, get) => ({
 
   // Modal states
   optionsModalSong: null,
-  playlistModalSong: null,
+  playlistModalSongs: null,
 
   // Initialize TrackPlayer
   initTrackPlayer: async () => {
@@ -609,6 +611,24 @@ export const useMusicStore = create<MusicStore>((set, get) => ({
     }
   },
 
+  addSongsToPlaylist: async (playlistId: string, songIds: string[]) => {
+    try {
+      await subsonicApi.updatePlaylist(playlistId, songIds);
+      await get().fetchPlaylists();
+    } catch (error) {
+      console.error('Error adding songs to playlist:', error);
+    }
+  },
+
+  removeSongFromPlaylist: async (playlistId: string, songIndex: number) => {
+    try {
+      await subsonicApi.updatePlaylist(playlistId, undefined, undefined, undefined, songIndex);
+      await get().fetchPlaylists();
+    } catch (error) {
+      console.error('Error removing song from playlist:', error);
+    }
+  },
+
   setCustomPlaylistImage: async (playlistId: string, uri: string | null) => {
     try {
       const currentImages = get().customPlaylistImages;
@@ -677,7 +697,7 @@ export const useMusicStore = create<MusicStore>((set, get) => ({
   },
 
   setOptionsModalSong: (song: Song | null) => set({ optionsModalSong: song }),
-  setPlaylistModalSong: (song: Song | null) => set({ playlistModalSong: song }),
+  setPlaylistModalSongs: (songs: Song[] | null) => set({ playlistModalSongs: songs }),
 }));
 
 export default useMusicStore;

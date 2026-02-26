@@ -4,13 +4,13 @@ import { Ionicons } from '@expo/vector-icons';
 import { useMusicStore } from '../store';
 import type { Song } from '../types';
 
-interface Props {
+export interface PlaylistSelectModalProps {
     visible: boolean;
-    song: Song | null;
+    songs: Song[] | null;
     onClose: () => void;
 }
 
-export const PlaylistSelectModal: React.FC<Props> = ({ visible, song, onClose }) => {
+export const PlaylistSelectModal: React.FC<PlaylistSelectModalProps> = ({ visible, songs, onClose }) => {
     const { playlists, fetchPlaylists, createPlaylist, addSongToPlaylist } = useMusicStore();
     const [isCreating, setIsCreating] = useState(false);
     const [newPlaylistName, setNewPlaylistName] = useState('');
@@ -23,10 +23,24 @@ export const PlaylistSelectModal: React.FC<Props> = ({ visible, song, onClose })
         }
     }, [visible]);
 
-    if (!song) return null;
+    if (!songs || songs.length === 0) return null;
 
     const handleSelectPlaylist = async (playlistId: string) => {
-        await addSongToPlaylist(playlistId, song.id);
+        const songIds = songs.map(s => s.id);
+        if (songIds.length === 1) {
+            await addSongToPlaylist(playlistId, songIds[0]);
+        } else {
+            // musicStore.addSongsToPlaylist should be implemented
+            // if we have implemented it:
+            if (useMusicStore.getState().addSongsToPlaylist) {
+                await useMusicStore.getState().addSongsToPlaylist(playlistId, songIds);
+            } else {
+                // simple fallback if function doesn't exist
+                for (const id of songIds) {
+                    await addSongToPlaylist(playlistId, id);
+                }
+            }
+        }
         onClose();
     };
 
