@@ -113,7 +113,7 @@ export const ThemesScreen: React.FC<ThemesScreenProps> = ({ navigation }) => {
 
             <FlatList
                 data={installedThemes}
-                keyExtractor={(item) => item.id}
+                keyExtractor={(item, index) => `${item.id}-${index}`}
                 renderItem={renderThemeItem}
                 contentContainerStyle={styles.listContent}
                 ListHeaderComponent={

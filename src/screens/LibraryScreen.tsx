@@ -179,7 +179,7 @@ export const LibraryScreen: React.FC<LibraryScreenProps> = ({ navigation, route 
   const renderAlbums = () => (
     <FlatList
       data={albums}
-      keyExtractor={(item) => item.id}
+      keyExtractor={(item, index) => `${item.id}-${index}`}
       numColumns={2}
       contentContainerStyle={styles.gridContent}
       columnWrapperStyle={styles.columnWrapper}
@@ -202,7 +202,7 @@ export const LibraryScreen: React.FC<LibraryScreenProps> = ({ navigation, route 
   const renderArtists = () => (
     <FlatList
       data={artists}
-      keyExtractor={(item) => item.id}
+      keyExtractor={(item, index) => `${item.id}-${index}`}
       numColumns={2}
       contentContainerStyle={styles.gridContent}
       columnWrapperStyle={styles.columnWrapper}
@@ -225,7 +225,7 @@ export const LibraryScreen: React.FC<LibraryScreenProps> = ({ navigation, route 
   const renderSongs = () => (
     <FlatList
       data={songs}
-      keyExtractor={(item) => item.id}
+      keyExtractor={(item, index) => `${item.id}-${index}`}
       contentContainerStyle={styles.listContent}
       refreshControl={
         <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={currentTheme.colors.primary} />
@@ -249,7 +249,7 @@ export const LibraryScreen: React.FC<LibraryScreenProps> = ({ navigation, route 
   const renderPlaylists = () => (
     <FlatList
       data={playlists}
-      keyExtractor={(item) => item.id}
+      keyExtractor={(item, index) => `${item.id}-${index}`}
       contentContainerStyle={styles.listContent}
       refreshControl={
         <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={currentTheme.colors.primary} />
@@ -290,7 +290,7 @@ export const LibraryScreen: React.FC<LibraryScreenProps> = ({ navigation, route 
     return (
       <FlatList
         data={downloadedList}
-        keyExtractor={(item) => item.song.id}
+        keyExtractor={(item, index) => `${item.song.id}-${index}`}
         contentContainerStyle={styles.listContent}
         ListHeaderComponent={
           downloadedList.length > 0 ? (

@@ -89,7 +89,7 @@ export const PlaylistDetailScreen: React.FC<PlaylistDetailScreenProps> = ({ navi
         <View style={[styles.container, { backgroundColor: currentTheme.colors.background }]}>
             <FlatList
                 data={songs}
-                keyExtractor={(item) => item.id}
+                keyExtractor={(item, index) => `${item.id}-${index}`}
                 contentContainerStyle={styles.listContent}
                 ListHeaderComponent={
                     <View style={styles.header}>

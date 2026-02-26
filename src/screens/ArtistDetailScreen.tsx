@@ -99,7 +99,7 @@ export const ArtistDetailScreen: React.FC<ArtistDetailScreenProps> = ({ navigati
     <View style={[styles.container, { backgroundColor: currentTheme.colors.background }]}>
       <FlatList
         data={albums}
-        keyExtractor={(item) => item.id}
+        keyExtractor={(item, index) => `${item.id}-${index}`}
         numColumns={2}
         contentContainerStyle={styles.listContent}
         columnWrapperStyle={styles.columnWrapper}

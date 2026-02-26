@@ -180,7 +180,7 @@ export const AlbumDetailScreen: React.FC<AlbumDetailScreenProps> = ({ navigation
     <View style={[styles.container, { backgroundColor: currentTheme.colors.background }]}>
       <FlatList
         data={songs}
-        keyExtractor={(item) => item.id}
+        keyExtractor={(item, index) => `${item.id}-${index}`}
         contentContainerStyle={styles.listContent}
         ListHeaderComponent={renderHeader()}
         refreshControl={

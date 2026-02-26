@@ -171,9 +171,9 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
               <Text style={[styles.loadingText, { color: currentTheme.colors.textSecondary }]}>Cargando...</Text>
             </View>
           ) : albums.length > 0 ? (
-            albums.slice(0, 10).map((album) => (
+            albums.slice(0, 10).map((album, index) => (
               <AlbumCard
-                key={album.id}
+                key={`${album.id}-${index}`}
                 album={album}
                 onPress={handleAlbumPress}
                 size={150}
@@ -204,9 +204,9 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
               <Text style={[styles.loadingText, { color: currentTheme.colors.textSecondary }]}>Cargando...</Text>
             </View>
           ) : artists.length > 0 ? (
-            artists.slice(0, 10).map((artist) => (
+            artists.slice(0, 10).map((artist, index) => (
               <ArtistCard
-                key={artist.id}
+                key={`${artist.id}-${index}`}
                 artist={artist}
                 onPress={handleArtistPress}
                 size={130}
@@ -222,8 +222,8 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
       <View style={styles.section}>
         <Text style={[styles.sectionTitle, { color: currentTheme.colors.text, paddingHorizontal: 16, marginBottom: 16 }]}>Más Álbumes</Text>
         <View style={styles.albumGrid}>
-          {albums.slice(10, 19).map((album) => (
-            <View key={album.id} style={styles.gridItem}>
+          {albums.slice(10, 19).map((album, index) => (
+            <View key={`${album.id}-${index}`} style={styles.gridItem}>
               <AlbumCard
                 album={album}
                 onPress={handleAlbumPress}

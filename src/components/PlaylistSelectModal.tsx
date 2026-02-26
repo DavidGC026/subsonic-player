@@ -81,7 +81,7 @@ export const PlaylistSelectModal: React.FC<Props> = ({ visible, song, onClose })
 
                                     <FlatList
                                         data={playlists}
-                                        keyExtractor={(item) => item.id}
+                                        keyExtractor={(item, index) => `${item.id}-${index}`}
                                         renderItem={({ item }) => (
                                             <TouchableOpacity style={styles.playlistItem} onPress={() => handleSelectPlaylist(item.id)}>
                                                 <Text style={styles.playlistName}>{item.name}</Text>
