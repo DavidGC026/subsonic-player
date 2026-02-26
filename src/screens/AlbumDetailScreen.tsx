@@ -10,7 +10,7 @@ import {
   Alert,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { useMusicStore, useThemeStore } from '../store';
+import { useMusicStore, useThemeStore, useModalStore } from '../store';
 import { AlbumArt, SongItem } from '../components';
 import type { Song, Album } from '../types';
 import { subsonicApi } from '../api/subsonic';
@@ -32,7 +32,8 @@ export const AlbumDetailScreen: React.FC<AlbumDetailScreenProps> = ({ navigation
   const [error, setError] = useState<string | null>(null);
   const [showOptionsMenu, setShowOptionsMenu] = useState(false);
 
-  const { playSong, addToQueue, setPlaylistModalSongs } = useMusicStore();
+  const { playSong, addToQueue } = useMusicStore();
+  const setPlaylistModalSongs = useModalStore(state => state.setPlaylistModalSongs);
   const { currentTheme } = useThemeStore();
 
   useEffect(() => {

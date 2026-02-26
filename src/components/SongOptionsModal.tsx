@@ -12,8 +12,9 @@ interface Props {
     onAddToPlaylist: () => void;
 }
 
-export const SongOptionsModal: React.FC<Props> = ({ visible, song, onClose, onAddToPlaylist }) => {
-    const { addToQueue, player } = useMusicStore();
+export const SongOptionsModal: React.FC<Props> = React.memo(({ visible, song, onClose, onAddToPlaylist }) => {
+    const addToQueue = useMusicStore(state => state.addToQueue);
+    const player = useMusicStore(state => state.player);
     const { downloadSong, removeDownload, isDownloaded, currentDownload } = useDownloadStore();
 
     if (!song) return null;
@@ -107,7 +108,7 @@ export const SongOptionsModal: React.FC<Props> = ({ visible, song, onClose, onAd
             </TouchableWithoutFeedback>
         </Modal>
     );
-};
+});
 
 const styles = StyleSheet.create({
     overlay: {

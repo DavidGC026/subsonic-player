@@ -83,12 +83,6 @@ interface MusicStore {
 
   // Star actions
   toggleStar: (id: string, type: 'song' | 'album' | 'artist', currentlyStarred: boolean) => Promise<void>;
-
-  // Modal states
-  optionsModalSong: Song | null;
-  playlistModalSongs: Song[] | null;
-  setOptionsModalSong: (song: Song | null) => void;
-  setPlaylistModalSongs: (songs: Song[] | null) => void;
 }
 
 /**
@@ -132,10 +126,6 @@ export const useMusicStore = create<MusicStore>((set, get) => ({
   isLoadingArtists: false,
   isLoadingAlbums: false,
   isLoadingPlaylists: false,
-
-  // Modal states
-  optionsModalSong: null,
-  playlistModalSongs: null,
 
   // Initialize TrackPlayer
   initTrackPlayer: async () => {
@@ -695,9 +685,6 @@ export const useMusicStore = create<MusicStore>((set, get) => ({
       console.error(`Error toggling star for ${type}:`, error);
     }
   },
-
-  setOptionsModalSong: (song: Song | null) => set({ optionsModalSong: song }),
-  setPlaylistModalSongs: (songs: Song[] | null) => set({ playlistModalSongs: songs }),
 }));
 
 export default useMusicStore;
