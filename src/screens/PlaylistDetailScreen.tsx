@@ -193,6 +193,14 @@ export const PlaylistDetailScreen: React.FC<PlaylistDetailScreenProps> = ({ navi
                         <Text style={[styles.songsTitle, { color: currentTheme.colors.text }]}>Canciones</Text>
                     </View>
                 }
+                initialNumToRender={15}
+                maxToRenderPerBatch={10}
+                windowSize={5}
+                getItemLayout={(data, index) => ({
+                    length: 66, // Includes album art
+                    offset: 66 * index,
+                    index,
+                })}
                 renderItem={({ item, index }) => (
                     <SongItem
                         song={item}

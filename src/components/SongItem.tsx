@@ -20,7 +20,7 @@ const formatDuration = (seconds: number): string => {
   return `${mins}:${secs.toString().padStart(2, '0')}`;
 };
 
-export const SongItem: React.FC<SongItemProps> = ({
+export const SongItem: React.FC<SongItemProps> = React.memo(({
   song,
   onPress,
   onOptionsPress,
@@ -28,11 +28,9 @@ export const SongItem: React.FC<SongItemProps> = ({
   showArt = true,
   index,
 }) => {
-  const { currentTheme } = useThemeStore();
-  const { isDownloaded, currentDownload } = useDownloadStore();
-
-  const songIsDownloaded = isDownloaded(song.id);
-  const isCurrentlyDownloading = currentDownload?.songId === song.id;
+  const currentTheme = useThemeStore(state => state.currentTheme);
+  const songIsDownloaded = useDownloadStore(state => state.isDownloaded(song.id));
+  const isCurrentlyDownloading = useDownloadStore(state => state.currentDownload?.songId === song.id);
 
   const handlePress = () => {
     onPress?.(song);
@@ -121,7 +119,12 @@ export const SongItem: React.FC<SongItemProps> = ({
       </TouchableOpacity>
     </TouchableOpacity>
   );
-};
+}, (prevProps, nextProps) => {
+  return prevProps.song.id === nextProps.song.id &&
+    prevProps.isPlaying === nextProps.isPlaying &&
+    prevProps.index === nextProps.index &&
+    prevProps.showArt === nextProps.showArt;
+});
 
 const styles = StyleSheet.create({
   container: {

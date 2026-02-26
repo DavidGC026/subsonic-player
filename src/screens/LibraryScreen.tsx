@@ -238,6 +238,14 @@ export const LibraryScreen: React.FC<LibraryScreenProps> = ({ navigation, route 
           index={index}
         />
       )}
+      initialNumToRender={15}
+      maxToRenderPerBatch={10}
+      windowSize={5}
+      getItemLayout={(data, index) => ({
+        length: 66,
+        offset: 66 * index,
+        index,
+      })}
       ListEmptyComponent={
         <View style={styles.emptyContainer}>
           <Text style={styles.emptyText}>No hay canciones disponibles</Text>
@@ -339,6 +347,14 @@ export const LibraryScreen: React.FC<LibraryScreenProps> = ({ navigation, route 
             </TouchableOpacity>
           </View>
         )}
+        initialNumToRender={15}
+        maxToRenderPerBatch={10}
+        windowSize={5}
+        getItemLayout={(data, index) => ({
+          length: 64, // Appx download item height
+          offset: 64 * index,
+          index,
+        })}
         ListEmptyComponent={
           <View style={dlStyles.emptyDownloadsContainer}>
             <Ionicons name="download-outline" size={64} color={currentTheme.colors.textSecondary} />

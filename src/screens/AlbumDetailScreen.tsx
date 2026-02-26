@@ -224,6 +224,14 @@ export const AlbumDetailScreen: React.FC<AlbumDetailScreenProps> = ({ navigation
             tintColor={currentTheme.colors.primary}
           />
         }
+        initialNumToRender={15}
+        maxToRenderPerBatch={10}
+        windowSize={5}
+        getItemLayout={(data, index) => ({
+          length: 60,
+          offset: 60 * index,
+          index,
+        })}
         renderItem={({ item, index }) => (
           <SongItem
             song={item}
