@@ -31,9 +31,9 @@ export const CacheManager = {
     /**
      * Get the playback URI for a song.
      * Returns the local cached file URI if available, otherwise returns the remote URL
-     * and starts a background download to cache the song for future plays.
+     * and optionally starts a background download to cache the song for future plays.
      */
-    getPlaybackUri: async (song: Song, remoteUrl: string): Promise<string> => {
+    getPlaybackUri: async (song: Song, remoteUrl: string, startDownload: boolean = true): Promise<string> => {
         const file = new File(getCacheDir(), `${song.id}.mp3`);
 
         if (file.exists) {
@@ -41,9 +41,13 @@ export const CacheManager = {
             return file.uri;
         }
 
-        // File not cached — stream remotely and start background download
-        console.log(`[Cache] Streaming remote: ${song.title}`);
-        CacheManager.downloadSong(song, remoteUrl);
+        // File not cached — stream remotely
+        if (startDownload) {
+            console.log(`[Cache] Streaming remote and caching: ${song.title}`);
+            CacheManager.downloadSong(song, remoteUrl);
+        } else {
+            console.log(`[Cache] Streaming remote without caching: ${song.title}`);
+        }
         return remoteUrl;
     },
 

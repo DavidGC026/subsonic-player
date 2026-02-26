@@ -178,11 +178,12 @@ export const useMusicStore = create<MusicStore>((set, get) => ({
       });
 
       // Listen for track changes
-      TrackPlayer.addEventListener(Event.PlaybackActiveTrackChanged, (event) => {
+      TrackPlayer.addEventListener(Event.PlaybackActiveTrackChanged, async (event) => {
         if (event.track) {
-          const { player } = get();
+          const { player, loadAndPlaySong } = get();
           const songIndex = player.queue.findIndex((s) => s.id === event.track?.id);
-          if (songIndex >= 0) {
+
+          if (songIndex >= 0 && songIndex !== player.currentIndex) {
             set((state) => ({
               player: {
                 ...state.player,
@@ -190,6 +191,15 @@ export const useMusicStore = create<MusicStore>((set, get) => ({
                 currentIndex: songIndex,
               },
             }));
+
+            // Auto-advanced to a new track, so let's cache it and scrobble it
+            const newSong = player.queue[songIndex];
+            const remoteUrl = subsonicApi.getStreamUrl(newSong.id);
+            await CacheManager.getPlaybackUri(newSong, remoteUrl, true);
+
+            setTimeout(() => {
+              subsonicApi.scrobble(newSong.id);
+            }, Math.min(30000, (newSong.duration * 1000) / 2));
           }
         }
       });
@@ -212,6 +222,16 @@ export const useMusicStore = create<MusicStore>((set, get) => ({
             position: (event.position || 0) * 1000, // Convert to ms for UI compatibility
             duration: (event.duration || 0) * 1000,
           },
+        }));
+      });
+
+      // Listen for error events
+      TrackPlayer.addEventListener(Event.PlaybackError, (event) => {
+        console.error('[TrackPlayer] Error:', event);
+        // Alert can be handled globally, but we definitely log it 
+        // and let the user know if they are stuck
+        set((state) => ({
+          player: { ...state.player, isPlaying: false }
         }));
       });
 
@@ -285,12 +305,14 @@ export const useMusicStore = create<MusicStore>((set, get) => ({
 
     if (shuffleMode) {
       nextIndex = Math.floor(Math.random() * queue.length);
+      await TrackPlayer.skip(nextIndex);
     } else {
       nextIndex = currentIndex + 1;
 
       if (nextIndex >= queue.length) {
         if (repeatMode === 'all') {
           nextIndex = 0;
+          await TrackPlayer.skip(nextIndex);
         } else {
           await TrackPlayer.pause();
           set((state) => ({
@@ -298,6 +320,8 @@ export const useMusicStore = create<MusicStore>((set, get) => ({
           }));
           return;
         }
+      } else {
+        await TrackPlayer.skipToNext();
       }
     }
 
@@ -305,8 +329,6 @@ export const useMusicStore = create<MusicStore>((set, get) => ({
     set((state) => ({
       player: { ...state.player, currentSong: nextSong, currentIndex: nextIndex },
     }));
-
-    await get().loadAndPlaySong(nextSong);
   },
 
   playPrevious: async () => {
@@ -319,11 +341,15 @@ export const useMusicStore = create<MusicStore>((set, get) => ({
 
     if (shuffleMode) {
       prevIndex = Math.floor(Math.random() * queue.length);
+      await TrackPlayer.skip(prevIndex);
     } else {
       prevIndex = currentIndex - 1;
 
       if (prevIndex < 0) {
         prevIndex = queue.length - 1;
+        await TrackPlayer.skip(prevIndex);
+      } else {
+        await TrackPlayer.skipToPrevious();
       }
     }
 
@@ -331,8 +357,6 @@ export const useMusicStore = create<MusicStore>((set, get) => ({
     set((state) => ({
       player: { ...state.player, currentSong: prevSong, currentIndex: prevIndex },
     }));
-
-    await get().loadAndPlaySong(prevSong);
   },
 
   togglePlay: () => {
@@ -399,15 +423,28 @@ export const useMusicStore = create<MusicStore>((set, get) => ({
   // Load and play a song
   loadAndPlaySong: async (song: Song) => {
     try {
-      const remoteUrl = subsonicApi.getStreamUrl(song.id);
+      const { player } = get();
+      const isQueueLoaded = player.queue.length > 0;
 
-      // Use CacheManager: serves local file if cached, remote URL otherwise
-      const finalUri = await CacheManager.getPlaybackUri(song, remoteUrl);
-      const track = buildTrack(song, finalUri);
+      // If we don't have a queue built up, just add this one track
+      if (!isQueueLoaded) {
+        await TrackPlayer.reset();
+        const remoteUrl = subsonicApi.getStreamUrl(song.id);
+        const finalUri = await CacheManager.getPlaybackUri(song, remoteUrl, true);
+        const track = buildTrack(song, finalUri);
+        await TrackPlayer.add(track);
+      } else {
+        // TrackPlayer is already populated with the queue, just skip to the song
+        const trackIndex = player.queue.findIndex(s => s.id === song.id);
+        if (trackIndex >= 0) {
+          await TrackPlayer.skip(trackIndex);
 
-      // Reset the TrackPlayer queue and load the new track
-      await TrackPlayer.reset();
-      await TrackPlayer.add(track);
+          // Manually start download for the active song
+          const remoteUrl = subsonicApi.getStreamUrl(song.id);
+          await CacheManager.getPlaybackUri(song, remoteUrl, true);
+        }
+      }
+
       await TrackPlayer.play();
 
       // Scrobble after a delay
@@ -423,6 +460,19 @@ export const useMusicStore = create<MusicStore>((set, get) => ({
   // Play a song immediately
   playSong: async (song: Song, queue?: Song[]) => {
     if (queue) {
+      // Rebuild the entire TrackPlayer queue
+      await TrackPlayer.reset();
+
+      const tracks = await Promise.all(queue.map(async (s) => {
+        const remoteUrl = subsonicApi.getStreamUrl(s.id);
+        // Do not start downloading everything in the background at once
+        const isCurrentlyPlaying = s.id === song.id;
+        const finalUri = await CacheManager.getPlaybackUri(s, remoteUrl, isCurrentlyPlaying);
+        return buildTrack(s, finalUri);
+      }));
+
+      await TrackPlayer.add(tracks);
+
       const songIndex = queue.findIndex((s) => s.id === song.id);
       set((state) => ({
         player: {
