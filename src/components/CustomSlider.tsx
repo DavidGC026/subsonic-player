@@ -56,20 +56,36 @@ export const CustomSlider: React.FC<CustomSliderProps> = ({
         PanResponder.create({
             onStartShouldSetPanResponder: () => true,
             onMoveShouldSetPanResponder: () => true,
-            onPanResponderGrant: (evt) => {
+            onPanResponderGrant: (evt, gestureState) => {
+                // Ignore clicks that are outside normal logic, but to prevent jumps, we just calculate from the current value
+                valueRef.current = value;
+                // If they just tapped somewhere, we can try to jump:
                 const offsetX = evt.nativeEvent.locationX;
-                const newValue = getValueFromOffset(offsetX);
+                let newValue = value;
+
+                // Only jump if it's a reasonably large move (means they tapped, didn't drag thumb)
+                const currentOffset = widthRef.current * ((value - minimumValue) / range);
+                if (Math.abs(offsetX - currentOffset) > 20) {
+                    newValue = getValueFromOffset(offsetX);
+                    valueRef.current = newValue;
+                }
+
                 onSlidingStart?.(newValue);
                 onValueChange?.(newValue);
             },
-            onPanResponderMove: (evt) => {
-                const offsetX = evt.nativeEvent.locationX;
-                const newValue = getValueFromOffset(offsetX);
+            onPanResponderMove: (evt, gestureState) => {
+                // Use gestureState.dx to add to the initial value for smooth relative dragging
+                const offsetDelta = gestureState.dx;
+                const valueDelta = range > 0 ? (offsetDelta / widthRef.current) * range : 0;
+
+                const newValue = clamp(valueRef.current + valueDelta, minimumValue, maximumValue);
                 onValueChange?.(newValue);
             },
-            onPanResponderRelease: (evt) => {
-                const offsetX = evt.nativeEvent.locationX;
-                const newValue = getValueFromOffset(offsetX);
+            onPanResponderRelease: (evt, gestureState) => {
+                const offsetDelta = gestureState.dx;
+                const valueDelta = range > 0 ? (offsetDelta / widthRef.current) * range : 0;
+
+                const newValue = clamp(valueRef.current + valueDelta, minimumValue, maximumValue);
                 onSlidingComplete?.(newValue);
             },
         })
@@ -88,7 +104,7 @@ export const CustomSlider: React.FC<CustomSliderProps> = ({
             onLayout={handleLayout}
             {...panResponder.panHandlers}
         >
-            <View style={styles.trackContainer}>
+            <View style={styles.trackContainer} pointerEvents="none">
                 <View
                     style={[
                         styles.track,

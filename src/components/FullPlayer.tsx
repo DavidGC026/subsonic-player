@@ -14,12 +14,6 @@ import { useMusicStore, useThemeStore } from '../store';
 import { AlbumArt } from './AlbumArt';
 import { ThemeIcon } from './ThemeIcon';
 import { AnimatedBackground } from './AnimatedBackground';
-import DraggableFlatList, {
-  RenderItemParams,
-  ScaleDecorator
-} from 'react-native-draggable-flatlist';
-import { GestureHandlerRootView } from 'react-native-gesture-handler';
-import { Song } from '../types';
 
 const { width: screenWidth, height: screenHeight } = Dimensions.get('window');
 
@@ -80,217 +74,219 @@ export const FullPlayer: React.FC<FullPlayerProps> = ({ onClose }) => {
   const displayDuration = duration || currentSong.duration * 1000;
 
   return (
-    <GestureHandlerRootView style={{ flex: 1 }}>
-      <View style={[styles.container, { backgroundColor: currentTheme.colors.background }]}>
-        {/* Background */}
-        <View style={styles.background}>
-          {currentTheme.flags?.animatedBackground ? (
-            <AnimatedBackground {...currentTheme.flags.animatedBackground} />
-          ) : currentTheme.flags?.useBackgroundImage ? (
-            <ImageBackground
-              source={require('../../assets/fondo.png')}
-              style={StyleSheet.absoluteFill}
-              resizeMode="cover"
-            >
-              {/* Dark overlay for readability */}
-              <View style={[StyleSheet.absoluteFill, { backgroundColor: 'rgba(0,0,0,0.5)' }]} />
-            </ImageBackground>
-          ) : (
-            <View style={[styles.gradient, { backgroundColor: currentTheme.colors.background }]} />
-          )}
-        </View>
-
-        {/* Header */}
-        <View style={styles.header}>
-          <TouchableOpacity onPress={onClose} style={styles.closeButton}>
-            <Ionicons name="chevron-down" size={32} color={currentTheme.colors.text} />
-          </TouchableOpacity>
-          <Text style={[styles.headerTitle, { color: currentTheme.colors.text }]}>{showQueue ? 'COLA' : 'REPRODUCIENDO'}</Text>
-          <TouchableOpacity style={styles.moreButton} onPress={() => setShowQueue(!showQueue)}>
-            <Ionicons name={showQueue ? "close" : "list"} size={26} color={currentTheme.colors.text} />
-          </TouchableOpacity>
-        </View>
-
-        {showQueue ? (
-          <View style={styles.queueContainer}>
-            <DraggableFlatList
-              data={queue}
-              keyExtractor={(item, index) => `${item.id}-${index}`}
-              onDragEnd={({ from, to }) => {
-                if (from !== to) {
-                  reorderQueue(from, to);
-                }
-              }}
-              renderItem={({ item, getIndex, drag, isActive }: RenderItemParams<Song>) => {
-                const activeIndex = getIndex();
-                return (
-                  <ScaleDecorator>
-                    <TouchableOpacity
-                      activeOpacity={0.8}
-                      style={[
-                        styles.queueItem,
-                        activeIndex === currentIndex && { backgroundColor: `${currentTheme.colors.primary}1A` },
-                        isActive && { backgroundColor: currentTheme.colors.surface, elevation: 5, shadowColor: '#000', shadowOpacity: 0.2, shadowRadius: 5 }
-                      ]}
-                      onPress={() => {
-                        playSong(item, queue);
-                        setShowQueue(false);
-                      }}
-                      onLongPress={drag}
-                      delayLongPress={200}
-                    >
-                      <AlbumArt coverArtId={item.coverArt} size={48} borderRadius={4} iconSize={24} />
-                      <View style={styles.queueItemInfo}>
-                        <Text style={[styles.queueItemTitle, { color: currentTheme.colors.text }, activeIndex === currentIndex && { color: currentTheme.colors.primary }]} numberOfLines={1}>{item.title}</Text>
-                        <Text style={[styles.queueItemArtist, { color: currentTheme.colors.textSecondary }, activeIndex === currentIndex && { color: currentTheme.colors.primary }]} numberOfLines={1}>{item.artist}</Text>
-                      </View>
-                      {activeIndex === currentIndex ? (
-                        <Ionicons name="volume-medium" size={20} color={currentTheme.colors.primary} />
-                      ) : (
-                        <Ionicons name="menu" size={20} color={currentTheme.colors.textSecondary} style={{ padding: 4 }} />
-                      )}
-                    </TouchableOpacity>
-                  </ScaleDecorator>
-                );
-              }}
-              showsVerticalScrollIndicator={false}
-            />
-          </View>
+    <View style={[styles.container, { backgroundColor: currentTheme.colors.background }]}>
+      {/* Background */}
+      <View style={styles.background}>
+        {currentTheme.flags?.animatedBackground ? (
+          <AnimatedBackground {...currentTheme.flags.animatedBackground} />
+        ) : currentTheme.flags?.useBackgroundImage ? (
+          <ImageBackground
+            source={require('../../assets/fondo.png')}
+            style={StyleSheet.absoluteFill}
+            resizeMode="cover"
+          >
+            {/* Dark overlay for readability */}
+            <View style={[StyleSheet.absoluteFill, { backgroundColor: 'rgba(0,0,0,0.5)' }]} />
+          </ImageBackground>
         ) : (
-          <>
-            {/* Album Art */}
-            <View style={styles.artContainer}>
-              <AlbumArt
-                coverArtId={currentSong.coverArt}
-                size={screenWidth * 0.75}
-                borderRadius={12}
-                iconSize={80}
-              />
-            </View>
-
-            <View style={styles.infoContainer}>
-              <View style={styles.titleRow}>
-                <View style={styles.titleInfo}>
-                  <Text style={[styles.title, { color: currentTheme.colors.text }]} numberOfLines={1} ellipsizeMode="tail">
-                    {currentSong.title}
-                  </Text>
-                  <Text style={[styles.artist, { color: currentTheme.colors.textSecondary }]} numberOfLines={1} ellipsizeMode="tail">
-                    {currentSong.artist} • {currentSong.album}
-                  </Text>
-                </View>
-                <TouchableOpacity
-                  style={styles.starButton}
-                  onPress={() => useMusicStore.getState().toggleStar(currentSong.id, 'song', !!currentSong.starred)}
-                  hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
-                >
-                  <Ionicons
-                    name={currentSong.starred ? "heart" : "heart-outline"}
-                    size={28}
-                    color={currentSong.starred ? currentTheme.colors.primary : currentTheme.colors.text}
-                  />
-                </TouchableOpacity>
-              </View>
-            </View>
-          </>
+          <View style={[styles.gradient, { backgroundColor: currentTheme.colors.background }]} />
         )}
+      </View>
 
-        {/* Progress Bar */}
-        <View style={styles.progressContainer}>
-          <CustomSlider
-            style={styles.slider}
-            minimumValue={0}
-            maximumValue={displayDuration}
-            value={displayPosition}
-            onSlidingStart={handleSlidingStart}
-            onSlidingComplete={handleSlidingComplete}
-            onValueChange={handleValueChange}
-            minimumTrackTintColor={currentTheme.colors.primary}
-            maximumTrackTintColor={currentTheme.colors.surface}
-            thumbTintColor={currentTheme.colors.text}
+      {/* Header */}
+      <View style={styles.header}>
+        <TouchableOpacity onPress={onClose} style={styles.closeButton}>
+          <Ionicons name="chevron-down" size={32} color={currentTheme.colors.text} />
+        </TouchableOpacity>
+        <Text style={[styles.headerTitle, { color: currentTheme.colors.text }]}>{showQueue ? 'COLA' : 'REPRODUCIENDO'}</Text>
+        <TouchableOpacity style={styles.moreButton} onPress={() => setShowQueue(!showQueue)}>
+          <Ionicons name={showQueue ? "close" : "list"} size={26} color={currentTheme.colors.text} />
+        </TouchableOpacity>
+      </View>
+
+      {showQueue ? (
+        <View style={styles.queueContainer}>
+          <FlatList
+            data={queue}
+            keyExtractor={(item, index) => `${item.id}-${index}`}
+            renderItem={({ item, index }) => (
+              <TouchableOpacity
+                activeOpacity={0.8}
+                style={[
+                  styles.queueItem,
+                  index === currentIndex && { backgroundColor: `${currentTheme.colors.primary}1A` }
+                ]}
+                onPress={() => {
+                  playSong(item, queue);
+                  setShowQueue(false);
+                }}
+              >
+                <AlbumArt coverArtId={item.coverArt} size={48} borderRadius={4} iconSize={24} />
+                <View style={styles.queueItemInfo}>
+                  <Text style={[styles.queueItemTitle, { color: currentTheme.colors.text }, index === currentIndex && { color: currentTheme.colors.primary }]} numberOfLines={1}>{item.title}</Text>
+                  <Text style={[styles.queueItemArtist, { color: currentTheme.colors.textSecondary }, index === currentIndex && { color: currentTheme.colors.primary }]} numberOfLines={1}>{item.artist}</Text>
+                </View>
+                {index === currentIndex ? (
+                  <Ionicons name="volume-medium" size={20} color={currentTheme.colors.primary} />
+                ) : (
+                  <View style={styles.queueItemActions}>
+                    {index !== undefined && index > 0 && (
+                      <TouchableOpacity
+                        onPress={() => reorderQueue(index, index - 1)}
+                        hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                      >
+                        <Ionicons name="chevron-up" size={20} color={currentTheme.colors.textSecondary} />
+                      </TouchableOpacity>
+                    )}
+                    {index !== undefined && index < queue.length - 1 && (
+                      <TouchableOpacity
+                        onPress={() => reorderQueue(index, index + 1)}
+                        hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                      >
+                        <Ionicons name="chevron-down" size={20} color={currentTheme.colors.textSecondary} />
+                      </TouchableOpacity>
+                    )}
+                  </View>
+                )}
+              </TouchableOpacity>
+            )}
+            showsVerticalScrollIndicator={false}
           />
-          <View style={styles.timeContainer}>
-            <Text style={[styles.timeText, { color: currentTheme.colors.textSecondary }]}>{formatTime(displayPosition)}</Text>
-            <Text style={[styles.timeText, { color: currentTheme.colors.textSecondary }]}>{formatTime(displayDuration)}</Text>
+        </View>
+      ) : (
+        <>
+          {/* Album Art */}
+          <View style={styles.artContainer}>
+            <AlbumArt
+              coverArtId={currentSong.coverArt}
+              size={screenWidth * 0.75}
+              borderRadius={12}
+              iconSize={80}
+            />
           </View>
-        </View>
 
-        {/* Controls */}
-        <View style={styles.controlsContainer}>
-          <TouchableOpacity
-            style={styles.secondaryControl}
-            onPress={toggleShuffle}
-          >
-            <ThemeIcon
-              name="shuffle"
-              size={24}
-              color={shuffleMode ? currentTheme.colors.primary : currentTheme.colors.textSecondary}
-            />
-          </TouchableOpacity>
-
-          <TouchableOpacity
-            style={styles.mainControl}
-            onPress={playPrevious}
-          >
-            <ThemeIcon name="play-skip-back" size={35} color={currentTheme.colors.text} />
-          </TouchableOpacity>
-
-          <TouchableOpacity
-            style={styles.playButton}
-            onPress={togglePlay}
-          >
-            <View style={[styles.playButtonBackground, { backgroundColor: currentTheme.colors.text }]}>
-              <ThemeIcon
-                name={isPlaying ? 'pause' : 'play'}
-                size={40}
-                color={currentTheme.colors.background}
-                style={isPlaying ? {} : { marginLeft: 4 }}
-              />
-            </View>
-          </TouchableOpacity>
-
-          <TouchableOpacity
-            style={styles.mainControl}
-            onPress={playNext}
-          >
-            <ThemeIcon name="play-skip-forward" size={35} color={currentTheme.colors.text} />
-          </TouchableOpacity>
-
-          <TouchableOpacity
-            style={styles.secondaryControl}
-            onPress={() => setRepeatMode(
-              repeatMode === 'none' ? 'all' : repeatMode === 'all' ? 'one' : 'none'
-            )}
-          >
-            <ThemeIcon
-              name="repeat"
-              size={24}
-              color={repeatMode !== 'none' ? currentTheme.colors.primary : currentTheme.colors.textSecondary}
-            />
-            {repeatMode === 'one' && (
-              <View style={[styles.repeatOneBadge, { backgroundColor: currentTheme.colors.primary }]}>
-                <Text style={[styles.repeatOneText, { color: currentTheme.colors.background }]}>1</Text>
+          <View style={styles.infoContainer}>
+            <View style={styles.titleRow}>
+              <View style={styles.titleInfo}>
+                <Text style={[styles.title, { color: currentTheme.colors.text }]} numberOfLines={1} ellipsizeMode="tail">
+                  {currentSong.title}
+                </Text>
+                <Text style={[styles.artist, { color: currentTheme.colors.textSecondary }]} numberOfLines={1} ellipsizeMode="tail">
+                  {currentSong.artist} • {currentSong.album}
+                </Text>
               </View>
-            )}
-          </TouchableOpacity>
-        </View>
+              <TouchableOpacity
+                style={styles.starButton}
+                onPress={() => useMusicStore.getState().toggleStar(currentSong.id, 'song', !!currentSong.starred)}
+                hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+              >
+                <Ionicons
+                  name={currentSong.starred ? "heart" : "heart-outline"}
+                  size={28}
+                  color={currentSong.starred ? currentTheme.colors.primary : currentTheme.colors.text}
+                />
+              </TouchableOpacity>
+            </View>
+          </View>
+        </>
+      )}
 
-        {/* Volume Control */}
-        <View style={styles.volumeContainer}>
-          <Ionicons name="volume-low" size={20} color={currentTheme.colors.textSecondary} />
-          <CustomSlider
-            style={styles.volumeSlider}
-            minimumValue={0}
-            maximumValue={1}
-            value={volume}
-            onValueChange={setVolume}
-            minimumTrackTintColor={currentTheme.colors.text}
-            maximumTrackTintColor={currentTheme.colors.surface}
-            thumbTintColor={currentTheme.colors.text}
-          />
-          <Ionicons name="volume-high" size={20} color={currentTheme.colors.textSecondary} />
+      {/* Progress Bar */}
+      <View style={styles.progressContainer}>
+        <CustomSlider
+          style={styles.slider}
+          minimumValue={0}
+          maximumValue={displayDuration}
+          value={displayPosition}
+          onSlidingStart={handleSlidingStart}
+          onSlidingComplete={handleSlidingComplete}
+          onValueChange={handleValueChange}
+          minimumTrackTintColor={currentTheme.colors.primary}
+          maximumTrackTintColor={currentTheme.colors.surface}
+          thumbTintColor={currentTheme.colors.text}
+        />
+        <View style={styles.timeContainer}>
+          <Text style={[styles.timeText, { color: currentTheme.colors.textSecondary }]}>{formatTime(displayPosition)}</Text>
+          <Text style={[styles.timeText, { color: currentTheme.colors.textSecondary }]}>{formatTime(displayDuration)}</Text>
         </View>
       </View>
-    </GestureHandlerRootView>
+
+      {/* Controls */}
+      <View style={styles.controlsContainer}>
+        <TouchableOpacity
+          style={styles.secondaryControl}
+          onPress={toggleShuffle}
+        >
+          <ThemeIcon
+            name="shuffle"
+            size={24}
+            color={shuffleMode ? currentTheme.colors.primary : currentTheme.colors.textSecondary}
+          />
+        </TouchableOpacity>
+
+        <TouchableOpacity
+          style={styles.mainControl}
+          onPress={playPrevious}
+        >
+          <ThemeIcon name="play-skip-back" size={35} color={currentTheme.colors.text} />
+        </TouchableOpacity>
+
+        <TouchableOpacity
+          style={styles.playButton}
+          onPress={togglePlay}
+        >
+          <View style={[styles.playButtonBackground, { backgroundColor: currentTheme.colors.text }]}>
+            <ThemeIcon
+              name={isPlaying ? 'pause' : 'play'}
+              size={40}
+              color={currentTheme.colors.background}
+              style={isPlaying ? {} : { marginLeft: 4 }}
+            />
+          </View>
+        </TouchableOpacity>
+
+        <TouchableOpacity
+          style={styles.mainControl}
+          onPress={playNext}
+        >
+          <ThemeIcon name="play-skip-forward" size={35} color={currentTheme.colors.text} />
+        </TouchableOpacity>
+
+        <TouchableOpacity
+          style={styles.secondaryControl}
+          onPress={() => setRepeatMode(
+            repeatMode === 'none' ? 'all' : repeatMode === 'all' ? 'one' : 'none'
+          )}
+        >
+          <ThemeIcon
+            name="repeat"
+            size={24}
+            color={repeatMode !== 'none' ? currentTheme.colors.primary : currentTheme.colors.textSecondary}
+          />
+          {repeatMode === 'one' && (
+            <View style={[styles.repeatOneBadge, { backgroundColor: currentTheme.colors.primary }]}>
+              <Text style={[styles.repeatOneText, { color: currentTheme.colors.background }]}>1</Text>
+            </View>
+          )}
+        </TouchableOpacity>
+      </View>
+
+      {/* Volume Control */}
+      <View style={styles.volumeContainer}>
+        <Ionicons name="volume-low" size={20} color={currentTheme.colors.textSecondary} />
+        <CustomSlider
+          style={styles.volumeSlider}
+          minimumValue={0}
+          maximumValue={1}
+          value={volume}
+          onValueChange={setVolume}
+          minimumTrackTintColor={currentTheme.colors.text}
+          maximumTrackTintColor={currentTheme.colors.surface}
+          thumbTintColor={currentTheme.colors.text}
+        />
+        <Ionicons name="volume-high" size={20} color={currentTheme.colors.textSecondary} />
+      </View>
+    </View>
   );
 };
 
@@ -441,6 +437,13 @@ const styles = StyleSheet.create({
   },
   queueItemArtist: {
     fontSize: 14,
+  },
+  queueItemActions: {
+    flexDirection: 'column',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingLeft: 8,
+    gap: 2,
   },
 });
 
