@@ -14,6 +14,7 @@ import { CacheManager } from '../services/CacheManager';
 interface PlayerState {
   currentSong: Song | null;
   queue: Song[];
+  originalQueue: Song[];
   currentIndex: number;
   isPlaying: boolean;
   position: number;
@@ -44,7 +45,9 @@ interface MusicStore {
   setCurrentSong: (song: Song | null) => void;
   setQueue: (songs: Song[]) => void;
   addToQueue: (song: Song) => void;
+  addNext: (song: Song) => void;
   removeFromQueue: (index: number) => void;
+  reorderQueue: (fromIndex: number, toIndex: number) => Promise<void>;
   playNext: () => Promise<void>;
   playPrevious: () => Promise<void>;
   togglePlay: () => void;
@@ -106,6 +109,7 @@ export const useMusicStore = create<MusicStore>((set, get) => ({
   player: {
     currentSong: null,
     queue: [],
+    originalQueue: [],
     currentIndex: -1,
     isPlaying: false,
     position: 0,
@@ -243,7 +247,12 @@ export const useMusicStore = create<MusicStore>((set, get) => ({
 
   setQueue: (songs: Song[]) => {
     set((state) => ({
-      player: { ...state.player, queue: songs, currentIndex: songs.length > 0 ? 0 : -1 },
+      player: {
+        ...state.player,
+        queue: songs,
+        originalQueue: state.player.shuffleMode ? state.player.originalQueue : songs,
+        currentIndex: songs.length > 0 ? 0 : -1
+      },
     }));
   },
 
@@ -257,14 +266,61 @@ export const useMusicStore = create<MusicStore>((set, get) => ({
     addTrackToQueue().catch(console.error);
 
     set((state) => ({
-      player: { ...state.player, queue: [...state.player.queue, song] },
+      player: {
+        ...state.player,
+        queue: [...state.player.queue, song],
+        originalQueue: [...state.player.originalQueue, song]
+      },
     }));
   },
 
-  removeFromQueue: (index: number) => {
+  addNext: (song: Song) => {
+    const { player } = get();
+    const insertIndex = player.currentIndex >= 0 ? player.currentIndex + 1 : 0;
+
+    const addTrackToQueue = async () => {
+      const remoteUrl = subsonicApi.getStreamUrl(song.id);
+      const finalUri = await CacheManager.getPlaybackUri(song, remoteUrl);
+      const track = buildTrack(song, finalUri);
+      // TrackPlayer inserts *before* the given index.
+      // E.g., if currentIndex is 0, we want to insert as index 1
+      await TrackPlayer.add(track, insertIndex);
+    };
+    addTrackToQueue().catch(console.error);
+
     set((state) => {
       const newQueue = [...state.player.queue];
+      newQueue.splice(insertIndex, 0, song);
+
+      let newOriginalQueue = state.player.originalQueue;
+      if (state.player.shuffleMode) {
+        newOriginalQueue = [...state.player.originalQueue];
+        // We don't have a perfect mapping back to original index, 
+        // appending is fine for manually added upcoming tracks
+        newOriginalQueue.push(song);
+      } else {
+        newOriginalQueue = [...newQueue];
+      }
+
+      return {
+        player: {
+          ...state.player,
+          queue: newQueue,
+          originalQueue: newOriginalQueue
+        },
+      };
+    });
+  },
+
+  removeFromQueue: (index: number) => {
+    // Remove from TrackPlayer
+    TrackPlayer.remove([index]).catch(console.error);
+
+    set((state) => {
+      const newQueue = [...state.player.queue];
+      const removedSong = newQueue[index];
       newQueue.splice(index, 1);
+
       let newIndex = state.player.currentIndex;
 
       if (index < state.player.currentIndex) {
@@ -281,40 +337,89 @@ export const useMusicStore = create<MusicStore>((set, get) => ({
         };
       }
 
+      const originalIndex = state.player.originalQueue.findIndex(s => s.id === removedSong?.id);
+      const newOriginalQueue = [...state.player.originalQueue];
+      if (originalIndex >= 0) {
+        newOriginalQueue.splice(originalIndex, 1);
+      }
+
       return {
-        player: { ...state.player, queue: newQueue, currentIndex: newIndex },
+        player: {
+          ...state.player,
+          queue: newQueue,
+          originalQueue: newOriginalQueue,
+          currentIndex: newIndex
+        },
+      };
+    });
+  },
+
+  reorderQueue: async (fromIndex: number, toIndex: number) => {
+    // Note: TrackPlayer move operation is slightly bugged on iOS sometimes, but works well on Android.
+    // If you move item down, it inserts *before* the index so we need to be careful
+    // DraggableFlatList guarantees it gives us the final valid indices.
+    try {
+      // For TrackPlayer, if toIndex > fromIndex, the actual insertion point changes
+      // because the item is removed first. If the library we use handles correct positions, we might just re-sync.
+      // But TrackPlayer's `move` API handles this internally too, (from, to).
+      await TrackPlayer.move(fromIndex, toIndex);
+    } catch (e) {
+      console.error(e);
+    }
+
+    set((state) => {
+      const newQueue = [...state.player.queue];
+      const [item] = newQueue.splice(fromIndex, 1);
+      newQueue.splice(toIndex, 0, item);
+
+      let newIndex = state.player.currentIndex;
+      if (newIndex === fromIndex) {
+        newIndex = toIndex;
+      } else if (fromIndex < newIndex && toIndex >= newIndex) {
+        newIndex--;
+      } else if (fromIndex > newIndex && toIndex <= newIndex) {
+        newIndex++;
+      }
+
+      // If shuffle is off, keep original queue in sync. If shuffle is on, we don't automatically sync it
+      // as they are explicitly manipulating the shuffled queue.
+      let newOriginalQueue = state.player.originalQueue;
+      if (!state.player.shuffleMode) {
+        newOriginalQueue = [...newQueue];
+      }
+
+      return {
+        player: {
+          ...state.player,
+          queue: newQueue,
+          originalQueue: newOriginalQueue,
+          currentIndex: newIndex,
+        },
       };
     });
   },
 
   playNext: async () => {
     const { player } = get();
-    const { queue, currentIndex, repeatMode, shuffleMode } = player;
+    const { queue, currentIndex, repeatMode } = player;
 
     if (queue.length === 0) return;
 
-    let nextIndex: number;
+    let nextIndex = currentIndex + 1;
 
-    if (shuffleMode) {
-      nextIndex = Math.floor(Math.random() * queue.length);
-      await TrackPlayer.skip(nextIndex);
-    } else {
-      nextIndex = currentIndex + 1;
-
-      if (nextIndex >= queue.length) {
-        if (repeatMode === 'all') {
-          nextIndex = 0;
-          await TrackPlayer.skip(nextIndex);
-        } else {
-          await TrackPlayer.pause();
-          set((state) => ({
-            player: { ...state.player, isPlaying: false },
-          }));
-          return;
-        }
+    if (nextIndex >= queue.length) {
+      if (repeatMode === 'all') {
+        nextIndex = 0;
+        await TrackPlayer.skip(nextIndex);
       } else {
-        await TrackPlayer.skipToNext();
+        await TrackPlayer.pause();
+        set((state) => ({
+          player: { ...state.player, isPlaying: false },
+        }));
+        return;
       }
+    } else {
+      await TrackPlayer.skipToNext();
     }
 
     const nextSong = queue[nextIndex];
@@ -325,24 +430,17 @@ export const useMusicStore = create<MusicStore>((set, get) => ({
 
   playPrevious: async () => {
     const { player } = get();
-    const { queue, currentIndex, shuffleMode } = player;
+    const { queue, currentIndex } = player;
 
     if (queue.length === 0) return;
 
-    let prevIndex: number;
+    let prevIndex = currentIndex - 1;
 
-    if (shuffleMode) {
-      prevIndex = Math.floor(Math.random() * queue.length);
+    if (prevIndex < 0) {
+      prevIndex = queue.length - 1;
       await TrackPlayer.skip(prevIndex);
     } else {
-      prevIndex = currentIndex - 1;
-
-      if (prevIndex < 0) {
-        prevIndex = queue.length - 1;
-        await TrackPlayer.skip(prevIndex);
-      } else {
-        await TrackPlayer.skipToPrevious();
-      }
+      await TrackPlayer.skipToPrevious();
     }
 
     const prevSong = queue[prevIndex];
@@ -394,9 +492,94 @@ export const useMusicStore = create<MusicStore>((set, get) => ({
   },
 
   toggleShuffle: () => {
-    set((state) => ({
-      player: { ...state.player, shuffleMode: !state.player.shuffleMode },
-    }));
+    const { player, loadAndPlaySong } = get();
+    const isNowShuffling = !player.shuffleMode;
+    const { currentSong, queue, originalQueue, currentIndex } = player;
+
+    if (queue.length === 0 || !currentSong) {
+      set((state) => ({
+        player: { ...state.player, shuffleMode: isNowShuffling },
+      }));
+      return;
+    }
+
+    const rebuildTrackPlayer = async (newQueue: Song[], newIndex: number) => {
+      // We must completely rebuild the track player's queue to physically reflect the shuffle
+      // and keep `skipToNext` behaving correctly in the UI.
+
+      // Save current progress
+      const currentPos = await TrackPlayer.getProgress();
+
+      // Reset player
+      await TrackPlayer.reset();
+
+      // Add new tracks
+      const tracks = await Promise.all(newQueue.map(async (s) => {
+        const remoteUrl = subsonicApi.getStreamUrl(s.id);
+        const isCurrentlyPlaying = s.id === currentSong.id;
+        const finalUri = await CacheManager.getPlaybackUri(s, remoteUrl, isCurrentlyPlaying);
+        return buildTrack(s, finalUri);
+      }));
+
+      await TrackPlayer.add(tracks);
+      await TrackPlayer.skip(newIndex);
+      await TrackPlayer.seekTo(currentPos.position);
+
+      if (player.isPlaying) {
+        await TrackPlayer.play();
+      }
+    };
+
+    if (isNowShuffling) {
+      // Shuffle mode turned ON
+      // 1. Keep history intact (if needed) by extracting everything before index.
+      // Easiest is to keep exactly 1 track active and randomize everything afterwards.
+      // Standard Spotify behavior: past history stays, upcoming is shuffled. Or just shuffle all but put current first.
+
+      const unplayed = originalQueue.filter(s => s.id !== currentSong.id);
+
+      // Fisher-Yates shuffle
+      for (let i = unplayed.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [unplayed[i], unplayed[j]] = [unplayed[j], unplayed[i]];
+      }
+
+      const shuffledQueue = [currentSong, ...unplayed];
+      const newIndex = 0; // Current song is now at 0
+
+      rebuildTrackPlayer(shuffledQueue, newIndex).catch(console.error);
+
+      set((state) => ({
+        player: {
+          ...state.player,
+          shuffleMode: true,
+          queue: shuffledQueue,
+          currentIndex: newIndex
+        },
+      }));
+    } else {
+      // Shuffle mode turned OFF
+      // Restore original queue order and find the current track in it
+      const restoredQueue = [...originalQueue];
+      let newIndex = restoredQueue.findIndex(s => s.id === currentSong.id);
+
+      if (newIndex === -1) {
+        // If song wasn't in original queue (maybe added next during shuffle?), just put it at 0 to be safe
+        restoredQueue.unshift(currentSong);
+        newIndex = 0;
+      }
+
+      rebuildTrackPlayer(restoredQueue, newIndex).catch(console.error);
+
+      set((state) => ({
+        player: {
+          ...state.player,
+          shuffleMode: false,
+          queue: restoredQueue,
+          currentIndex: newIndex
+        },
+      }));
+    }
   },
 
   setVolume: (volume: number) => {
@@ -470,8 +653,11 @@ export const useMusicStore = create<MusicStore>((set, get) => ({
         player: {
           ...state.player,
           queue,
+          originalQueue: queue, // Override original queue on fresh play context
           currentIndex: songIndex >= 0 ? songIndex : 0,
           currentSong: song,
+          // Disable shuffle on fresh context list (equivalent to typical Spotify behaviour, or keep state logic and force shuffle rebuild instead)
+          shuffleMode: false,
         },
       }));
     } else {
@@ -479,6 +665,8 @@ export const useMusicStore = create<MusicStore>((set, get) => ({
         player: {
           ...state.player,
           currentSong: song,
+          // ensure song is at least in original too
+          originalQueue: state.player.originalQueue.find(s => s.id === song.id) ? state.player.originalQueue : [...state.player.originalQueue, song]
         },
       }));
     }

@@ -24,17 +24,25 @@ interface PlaylistDownloadProgress {
     currentSongTitle: string;
 }
 
+export interface DownloadedPlaylist {
+    playlist: import('../types').Playlist;
+    songs: Song[];
+    downloadedAt: number;
+}
+
 interface DownloadStore {
     // State
     downloadedSongs: Record<string, DownloadedSong>;
+    downloadedPlaylists: Record<string, DownloadedPlaylist>;
     currentDownload: DownloadProgress | null;
     playlistDownloadProgress: PlaylistDownloadProgress | null;
 
     // Actions
     loadDownloads: () => Promise<void>;
     downloadSong: (song: Song) => Promise<void>;
-    downloadPlaylist: (playlistId: string, songs: Song[]) => Promise<void>;
+    downloadPlaylist: (playlist: import('../types').Playlist, songs: Song[]) => Promise<void>;
     removeDownload: (songId: string) => Promise<void>;
+    removePlaylistDownload: (playlistId: string) => Promise<void>;
     removeAllDownloads: () => Promise<void>;
     isDownloaded: (songId: string) => boolean;
     getTotalSize: () => number;
@@ -42,18 +50,25 @@ interface DownloadStore {
 }
 
 let playlistDownloadCancelled = false;
+const PLAYLISTS_KEY = '@downloaded_playlists';
 
 export const useDownloadStore = create<DownloadStore>((set, get) => ({
     downloadedSongs: {},
+    downloadedPlaylists: {},
     currentDownload: null,
     playlistDownloadProgress: null,
 
     loadDownloads: async () => {
         try {
             const stored = await AsyncStorage.getItem(DOWNLOADS_KEY);
+            const storedPlaylists = await AsyncStorage.getItem(PLAYLISTS_KEY);
             if (stored) {
                 const parsed = JSON.parse(stored) as Record<string, DownloadedSong>;
                 set({ downloadedSongs: parsed });
+            }
+            if (storedPlaylists) {
+                const parsedPlaylists = JSON.parse(storedPlaylists) as Record<string, DownloadedPlaylist>;
+                set({ downloadedPlaylists: parsedPlaylists });
             }
         } catch (error) {
             console.error('[Downloads] Error loading downloads:', error);
@@ -92,9 +107,20 @@ export const useDownloadStore = create<DownloadStore>((set, get) => ({
         }
     },
 
-    downloadPlaylist: async (playlistId: string, songs: Song[]) => {
+    downloadPlaylist: async (playlist: import('../types').Playlist, songs: Song[]) => {
         const { downloadedSongs } = get();
         playlistDownloadCancelled = false;
+
+        // Always try to cache the playlist info itself when 'download' is issued
+        const downloadedPlaylist: DownloadedPlaylist = {
+            playlist,
+            songs,
+            downloadedAt: Date.now()
+        };
+
+        const newPlaylists = { ...get().downloadedPlaylists, [playlist.id]: downloadedPlaylist };
+        set({ downloadedPlaylists: newPlaylists });
+        await AsyncStorage.setItem(PLAYLISTS_KEY, JSON.stringify(newPlaylists));
 
         // Filter out already downloaded songs
         const songsToDownload = songs.filter((s) => !downloadedSongs[s.id]);
@@ -103,7 +129,7 @@ export const useDownloadStore = create<DownloadStore>((set, get) => ({
 
         set({
             playlistDownloadProgress: {
-                playlistId,
+                playlistId: playlist.id,
                 total: songsToDownload.length,
                 completed: 0,
                 currentSongTitle: songsToDownload[0].title,
@@ -120,7 +146,7 @@ export const useDownloadStore = create<DownloadStore>((set, get) => ({
 
             set({
                 playlistDownloadProgress: {
-                    playlistId,
+                    playlistId: playlist.id,
                     total: songsToDownload.length,
                     completed: i,
                     currentSongTitle: song.title,
@@ -163,11 +189,23 @@ export const useDownloadStore = create<DownloadStore>((set, get) => ({
         }
     },
 
+    removePlaylistDownload: async (playlistId: string) => {
+        try {
+            const newPlaylists = { ...get().downloadedPlaylists };
+            delete newPlaylists[playlistId];
+            set({ downloadedPlaylists: newPlaylists });
+            await AsyncStorage.setItem(PLAYLISTS_KEY, JSON.stringify(newPlaylists));
+        } catch (error) {
+            console.error('[Downloads] Error removing playlist info:', error);
+        }
+    },
+
     removeAllDownloads: async () => {
         try {
             await CacheManager.clearAll();
-            set({ downloadedSongs: {} });
+            set({ downloadedSongs: {}, downloadedPlaylists: {} });
             await AsyncStorage.removeItem(DOWNLOADS_KEY);
+            await AsyncStorage.removeItem(PLAYLISTS_KEY);
         } catch (error) {
             console.error('[Downloads] Error removing all downloads:', error);
         }

@@ -23,11 +23,7 @@ export const SongOptionsModal: React.FC<Props> = React.memo(({ visible, song, on
     const isCurrentlyDownloading = currentDownload?.songId === song.id;
 
     const handlePlayNext = () => {
-        // Insert into queue right after current index
-        const newQueue = [...player.queue];
-        const insertIndex = player.currentIndex >= 0 ? player.currentIndex + 1 : 0;
-        newQueue.splice(insertIndex, 0, song);
-        useMusicStore.getState().setQueue(newQueue);
+        useMusicStore.getState().addNext(song);
         onClose();
     };
 

@@ -87,13 +87,13 @@ export const PlaylistEditModal: React.FC<Props> = ({ visible, playlist, onClose,
             try {
                 const { songs: playlistSongs } = await subsonicApi.getPlaylist(playlist.id);
                 onClose();
-                await downloadPlaylist(playlist.id, playlistSongs);
+                await downloadPlaylist(playlist, playlistSongs);
             } catch (error) {
                 console.error('Error fetching playlist songs for download:', error);
             }
         } else {
             onClose();
-            await downloadPlaylist(playlist.id, songs);
+            await downloadPlaylist(playlist, songs);
         }
     };
 
@@ -113,6 +113,7 @@ export const PlaylistEditModal: React.FC<Props> = ({ visible, playlist, onClose,
                                 await removeDownload(song.id);
                             }
                         }
+                        useDownloadStore.getState().removePlaylistDownload(playlist.id);
                         onClose();
                     }
                 }

@@ -9,7 +9,7 @@ import {
     Alert,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { useMusicStore, useThemeStore, useModalStore } from '../store';
+import { useMusicStore, useThemeStore, useModalStore, useDownloadStore } from '../store';
 import { SongItem, PlaylistEditModal, PlaylistAddSongsModal } from '../components';
 import type { Song, Playlist } from '../types';
 import { subsonicApi } from '../api/subsonic';
@@ -46,7 +46,13 @@ export const PlaylistDetailScreen: React.FC<PlaylistDetailScreenProps> = ({ navi
             setPlaylist(playlistData);
             setSongs(playlistSongs);
         } catch (error) {
-            console.error('Error loading playlist:', error);
+            console.error('Error loading playlist from API, checking offline cache...', error);
+            // Fallback to offline downloaded version if available
+            const offlinePlaylists = useDownloadStore.getState().downloadedPlaylists;
+            if (offlinePlaylists && offlinePlaylists[playlistId]) {
+                setPlaylist(offlinePlaylists[playlistId].playlist);
+                setSongs(offlinePlaylists[playlistId].songs);
+            }
         } finally {
             setIsLoading(false);
         }
