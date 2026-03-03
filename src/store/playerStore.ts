@@ -163,6 +163,22 @@ export const usePlayerStore = create<PlayerStore>((set, get) => ({
                         const remoteUrl = subsonicApi.getStreamUrl(newSong.id);
                         await CacheManager.getPlaybackUri(newSong, remoteUrl, true);
 
+                        // ── Pre-fetch n+1: silently cache the NEXT song in queue ──
+                        const nextIndex = songIndex + 1;
+                        if (nextIndex < player.queue.length) {
+                            const nextSong = player.queue[nextIndex];
+                            CacheManager.isCached(nextSong.id).then((alreadyCached) => {
+                                if (!alreadyCached) {
+                                    const nextRemoteUrl = subsonicApi.getStreamUrl(nextSong.id);
+                                    console.log(`[Pre-fetch] Descargando en background: ${nextSong.title}`);
+                                    CacheManager.getPlaybackUri(nextSong, nextRemoteUrl, true)
+                                        .catch((err) => console.warn('[Pre-fetch] Error:', err));
+                                } else {
+                                    console.log(`[Pre-fetch] Ya en caché: ${nextSong.title}`);
+                                }
+                            }).catch((err) => console.warn('[Pre-fetch] Check error:', err));
+                        }
+
                         setTimeout(() => {
                             subsonicApi.scrobble(newSong.id);
                         }, Math.min(30000, (newSong.duration * 1000) / 2));
@@ -599,6 +615,24 @@ export const usePlayerStore = create<PlayerStore>((set, get) => ({
         }
 
         await get().loadAndPlaySong(song);
+
+        // ── Pre-fetch n+1 on manual play ──
+        const currentQueue = queue || get().player.queue;
+        const idx = currentQueue.findIndex((s) => s.id === song.id);
+        const nextIdx = idx + 1;
+        if (nextIdx < currentQueue.length) {
+            const nextSong = currentQueue[nextIdx];
+            CacheManager.isCached(nextSong.id).then((alreadyCached) => {
+                if (!alreadyCached) {
+                    const nextRemoteUrl = subsonicApi.getStreamUrl(nextSong.id);
+                    console.log(`[Pre-fetch] Descargando en background: ${nextSong.title}`);
+                    CacheManager.getPlaybackUri(nextSong, nextRemoteUrl, true)
+                        .catch((err) => console.warn('[Pre-fetch] Error:', err));
+                } else {
+                    console.log(`[Pre-fetch] Ya en caché: ${nextSong.title}`);
+                }
+            }).catch((err) => console.warn('[Pre-fetch] Check error:', err));
+        }
     },
 
     toggleStar: async (id: string, type: 'song' | 'album' | 'artist', currentlyStarred: boolean) => {
