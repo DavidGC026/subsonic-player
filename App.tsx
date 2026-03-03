@@ -1,14 +1,15 @@
 import React, { useEffect } from 'react';
 import { StatusBar } from 'expo-status-bar';
-import { View, StyleSheet } from 'react-native';
+import { StyleSheet } from 'react-native';
+import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { AppNavigator } from './src/navigation';
 import { CacheManager } from './src/services/CacheManager';
-import { useDownloadStore, useMusicStore } from './src/store';
+import { useDownloadStore, usePlayerStore } from './src/store';
 
 export default function App() {
   useEffect(() => {
     // Initialize TrackPlayer
-    useMusicStore.getState().initTrackPlayer();
+    usePlayerStore.getState().initTrackPlayer();
 
     // Initialize music cache directory and load downloads
     CacheManager.init()
@@ -19,10 +20,10 @@ export default function App() {
   }, []);
 
   return (
-    <View style={styles.container}>
+    <GestureHandlerRootView style={styles.container}>
       <StatusBar style="light" />
       <AppNavigator />
-    </View>
+    </GestureHandlerRootView>
   );
 }
 

@@ -1,13 +1,18 @@
-import React, { useState, useCallback } from 'react';
+import React, { useState, useCallback, useRef, useEffect } from 'react';
 import {
   View,
   Text,
   TouchableOpacity,
   StyleSheet,
-  Dimensions,
-  FlatList,
   ImageBackground,
+  StatusBar,
+  Animated as RNAnimated,
+  Image,
 } from 'react-native';
+import DraggableFlatList, {
+  ScaleDecorator,
+  RenderItemParams,
+} from 'react-native-draggable-flatlist';
 import { Ionicons } from '@expo/vector-icons';
 import { CustomSlider } from './CustomSlider';
 import { usePlayerStore, useThemeStore } from '../store';
@@ -15,8 +20,9 @@ import { AlbumArt } from './AlbumArt';
 import { ThemeIcon } from './ThemeIcon';
 import { AnimatedBackground } from './AnimatedBackground';
 import { useIsTablet } from '../hooks/useIsTablet';
-
-const { width: screenWidth, height: screenHeight } = Dimensions.get('window');
+import { useLandscape } from '../hooks/useLandscape';
+import { subsonicApi } from '../api/subsonic';
+import type { Song } from '../types';
 
 interface FullPlayerProps {
   onClose?: () => void;
@@ -28,6 +34,275 @@ const formatTime = (milliseconds: number): string => {
   const secs = totalSeconds % 60;
   return `${mins}:${secs.toString().padStart(2, '0')}`;
 };
+
+// ─── Immersive Landscape View ────────────────────────────────────────────────
+
+interface ImmersiveViewProps {
+  currentSong: Song;
+  isPlaying: boolean;
+  onTogglePlay: () => void;
+  onNext: () => void;
+  onPrevious: () => void;
+  onClose?: () => void;
+  screenWidth: number;
+  screenHeight: number;
+}
+
+const ImmersiveView: React.FC<ImmersiveViewProps> = ({
+  currentSong,
+  isPlaying,
+  onTogglePlay,
+  onNext,
+  onPrevious,
+  onClose,
+  screenWidth,
+  screenHeight,
+}) => {
+  const [showControls, setShowControls] = useState(false);
+  const fadeAnim = useRef(new RNAnimated.Value(0)).current;
+  const hideTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const artSize = Math.min(screenWidth, screenHeight) * 0.85;
+  const coverUrl = subsonicApi.getCoverArtUrl(currentSong.coverArt, 1000);
+
+  const toggleControls = useCallback(() => {
+    if (hideTimer.current) clearTimeout(hideTimer.current);
+
+    if (showControls) {
+      // Hide
+      RNAnimated.timing(fadeAnim, {
+        toValue: 0,
+        duration: 250,
+        useNativeDriver: true,
+      }).start(() => setShowControls(false));
+    } else {
+      // Show
+      setShowControls(true);
+      RNAnimated.timing(fadeAnim, {
+        toValue: 1,
+        duration: 250,
+        useNativeDriver: true,
+      }).start();
+
+      // Auto-hide after 4 seconds
+      hideTimer.current = setTimeout(() => {
+        RNAnimated.timing(fadeAnim, {
+          toValue: 0,
+          duration: 400,
+          useNativeDriver: true,
+        }).start(() => setShowControls(false));
+      }, 4000);
+    }
+  }, [showControls, fadeAnim]);
+
+  useEffect(() => {
+    return () => {
+      if (hideTimer.current) clearTimeout(hideTimer.current);
+    };
+  }, []);
+
+  return (
+    <TouchableOpacity
+      activeOpacity={1}
+      style={immersiveStyles.container}
+      onPress={toggleControls}
+    >
+      <StatusBar hidden />
+
+      {/* Full-screen cover art */}
+      {coverUrl ? (
+        <Image
+          source={{ uri: coverUrl }}
+          style={[immersiveStyles.coverArt, { width: artSize, height: artSize }]}
+          resizeMode="contain"
+        />
+      ) : (
+        <View style={[immersiveStyles.placeholder, { width: artSize, height: artSize }]}>
+          <Ionicons name="musical-note" size={120} color="#333" />
+        </View>
+      )}
+
+      {/* Song title at bottom */}
+      <View style={immersiveStyles.songInfo}>
+        <Text style={immersiveStyles.songTitle} numberOfLines={1}>{currentSong.title}</Text>
+        <Text style={immersiveStyles.songArtist} numberOfLines={1}>{currentSong.artist}</Text>
+      </View>
+
+      {/* Overlay controls (shown on tap) */}
+      {showControls && (
+        <RNAnimated.View style={[immersiveStyles.controlsOverlay, { opacity: fadeAnim }]}>
+          {/* Close button */}
+          <TouchableOpacity
+            style={immersiveStyles.closeBtn}
+            onPress={onClose}
+            hitSlop={{ top: 16, bottom: 16, left: 16, right: 16 }}
+          >
+            <Ionicons name="chevron-down" size={32} color="#fff" />
+          </TouchableOpacity>
+
+          {/* Playback controls */}
+          <View style={immersiveStyles.playbackRow}>
+            <TouchableOpacity onPress={onPrevious} style={immersiveStyles.controlBtn}>
+              <Ionicons name="play-skip-back" size={36} color="#fff" />
+            </TouchableOpacity>
+            <TouchableOpacity onPress={onTogglePlay} style={immersiveStyles.playBtn}>
+              <Ionicons name={isPlaying ? 'pause' : 'play'} size={48} color="#000" />
+            </TouchableOpacity>
+            <TouchableOpacity onPress={onNext} style={immersiveStyles.controlBtn}>
+              <Ionicons name="play-skip-forward" size={36} color="#fff" />
+            </TouchableOpacity>
+          </View>
+        </RNAnimated.View>
+      )}
+    </TouchableOpacity>
+  );
+};
+
+const immersiveStyles = StyleSheet.create({
+  container: {
+    flex: 1,
+    backgroundColor: '#000000',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  coverArt: {
+    borderRadius: 4,
+  },
+  placeholder: {
+    backgroundColor: '#111',
+    borderRadius: 4,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  songInfo: {
+    position: 'absolute',
+    bottom: 24,
+    left: 32,
+    right: 32,
+    alignItems: 'center',
+  },
+  songTitle: {
+    color: 'rgba(255,255,255,0.7)',
+    fontSize: 14,
+    fontWeight: '600',
+    marginBottom: 2,
+  },
+  songArtist: {
+    color: 'rgba(255,255,255,0.4)',
+    fontSize: 12,
+  },
+  controlsOverlay: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: 'rgba(0,0,0,0.45)',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  closeBtn: {
+    position: 'absolute',
+    top: 16,
+    left: 16,
+    padding: 8,
+  },
+  playbackRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 40,
+  },
+  controlBtn: {
+    padding: 12,
+  },
+  playBtn: {
+    width: 72,
+    height: 72,
+    borderRadius: 36,
+    backgroundColor: '#fff',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+});
+
+// ─── Queue Item for Drag & Drop ─────────────────────────────────────────────
+
+interface QueueItemProps {
+  item: Song;
+  index: number;
+  currentIndex: number;
+  currentTheme: any;
+  onPress: (song: Song) => void;
+  drag: () => void;
+  isActive: boolean;
+}
+
+const QueueItem: React.FC<QueueItemProps> = React.memo(({
+  item,
+  index,
+  currentIndex,
+  currentTheme,
+  onPress,
+  drag,
+  isActive,
+}) => {
+  return (
+    <ScaleDecorator>
+      <TouchableOpacity
+        activeOpacity={0.7}
+        style={[
+          styles.queueItem,
+          index === currentIndex && { backgroundColor: `${currentTheme.colors.primary}1A` },
+          isActive && {
+            backgroundColor: `${currentTheme.colors.primary}33`,
+            shadowColor: currentTheme.colors.primary,
+            shadowOffset: { width: 0, height: 4 },
+            shadowOpacity: 0.3,
+            shadowRadius: 8,
+            elevation: 8,
+          },
+        ]}
+        onPress={() => onPress(item)}
+        onLongPress={drag}
+        delayLongPress={150}
+      >
+        {/* Drag handle */}
+        <View style={styles.dragHandle}>
+          <Ionicons
+            name="reorder-three"
+            size={20}
+            color={isActive ? currentTheme.colors.primary : currentTheme.colors.textSecondary}
+          />
+        </View>
+
+        <AlbumArt coverArtId={item.coverArt} size={48} borderRadius={4} iconSize={24} />
+        <View style={styles.queueItemInfo}>
+          <Text
+            style={[
+              styles.queueItemTitle,
+              { color: currentTheme.colors.text },
+              index === currentIndex && { color: currentTheme.colors.primary },
+            ]}
+            numberOfLines={1}
+          >
+            {item.title}
+          </Text>
+          <Text
+            style={[
+              styles.queueItemArtist,
+              { color: currentTheme.colors.textSecondary },
+              index === currentIndex && { color: currentTheme.colors.primary },
+            ]}
+            numberOfLines={1}
+          >
+            {item.artist}
+          </Text>
+        </View>
+        {index === currentIndex && (
+          <Ionicons name="volume-medium" size={20} color={currentTheme.colors.primary} />
+        )}
+      </TouchableOpacity>
+    </ScaleDecorator>
+  );
+});
+
+// ─── Main FullPlayer Component ──────────────────────────────────────────────
 
 export const FullPlayer: React.FC<FullPlayerProps> = ({ onClose }) => {
   const {
@@ -49,6 +324,7 @@ export const FullPlayer: React.FC<FullPlayerProps> = ({ onClose }) => {
   const [showQueue, setShowQueue] = useState(false);
   const { currentTheme } = useThemeStore();
   const { isTablet, screenWidth } = useIsTablet();
+  const { isLandscape, screenWidth: lsWidth, screenHeight: lsHeight } = useLandscape();
   const artSize = isTablet ? screenWidth * 0.35 : screenWidth * 0.75;
 
   const handleSeek = useCallback(async (value: number) => {
@@ -69,8 +345,50 @@ export const FullPlayer: React.FC<FullPlayerProps> = ({ onClose }) => {
     setSeekPosition(value);
   }, []);
 
+  const handleQueueItemPress = useCallback((song: Song) => {
+    playSong(song, queue);
+    setShowQueue(false);
+  }, [playSong, queue]);
+
+  const handleDragEnd = useCallback(({ from, to }: { from: number; to: number }) => {
+    if (from !== to) {
+      reorderQueue(from, to);
+    }
+  }, [reorderQueue]);
+
+  const renderQueueItem = useCallback(({ item, getIndex, drag, isActive }: RenderItemParams<Song>) => {
+    const index = getIndex() ?? 0;
+    return (
+      <QueueItem
+        item={item}
+        index={index}
+        currentIndex={currentIndex}
+        currentTheme={currentTheme}
+        onPress={handleQueueItemPress}
+        drag={drag}
+        isActive={isActive}
+      />
+    );
+  }, [currentIndex, currentTheme, handleQueueItemPress]);
+
   if (!currentSong) {
     return null;
+  }
+
+  // ── Immersive Mode: Landscape on phones ──
+  if (isLandscape && !isTablet) {
+    return (
+      <ImmersiveView
+        currentSong={currentSong}
+        isPlaying={isPlaying}
+        onTogglePlay={togglePlay}
+        onNext={playNext}
+        onPrevious={playPrevious}
+        onClose={onClose}
+        screenWidth={lsWidth}
+        screenHeight={lsHeight}
+      />
+    );
   }
 
   const displayPosition = isSeeking ? seekPosition : position;
@@ -109,51 +427,14 @@ export const FullPlayer: React.FC<FullPlayerProps> = ({ onClose }) => {
 
       {showQueue ? (
         <View style={styles.queueContainer}>
-          <FlatList
+          <DraggableFlatList
             data={queue}
             keyExtractor={(item, index) => `${item.id}-${index}`}
-            renderItem={({ item, index }) => (
-              <TouchableOpacity
-                activeOpacity={0.8}
-                style={[
-                  styles.queueItem,
-                  index === currentIndex && { backgroundColor: `${currentTheme.colors.primary}1A` }
-                ]}
-                onPress={() => {
-                  playSong(item, queue);
-                  setShowQueue(false);
-                }}
-              >
-                <AlbumArt coverArtId={item.coverArt} size={48} borderRadius={4} iconSize={24} />
-                <View style={styles.queueItemInfo}>
-                  <Text style={[styles.queueItemTitle, { color: currentTheme.colors.text }, index === currentIndex && { color: currentTheme.colors.primary }]} numberOfLines={1}>{item.title}</Text>
-                  <Text style={[styles.queueItemArtist, { color: currentTheme.colors.textSecondary }, index === currentIndex && { color: currentTheme.colors.primary }]} numberOfLines={1}>{item.artist}</Text>
-                </View>
-                {index === currentIndex ? (
-                  <Ionicons name="volume-medium" size={20} color={currentTheme.colors.primary} />
-                ) : (
-                  <View style={styles.queueItemActions}>
-                    {index !== undefined && index > 0 && (
-                      <TouchableOpacity
-                        onPress={() => reorderQueue(index, index - 1)}
-                        hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-                      >
-                        <Ionicons name="chevron-up" size={20} color={currentTheme.colors.textSecondary} />
-                      </TouchableOpacity>
-                    )}
-                    {index !== undefined && index < queue.length - 1 && (
-                      <TouchableOpacity
-                        onPress={() => reorderQueue(index, index + 1)}
-                        hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-                      >
-                        <Ionicons name="chevron-down" size={20} color={currentTheme.colors.textSecondary} />
-                      </TouchableOpacity>
-                    )}
-                  </View>
-                )}
-              </TouchableOpacity>
-            )}
+            renderItem={renderQueueItem}
+            onDragEnd={handleDragEnd}
             showsVerticalScrollIndicator={false}
+            containerStyle={styles.dragListContainer}
+            activationDistance={10}
           />
         </View>
       ) : isTablet ? (
@@ -398,18 +679,27 @@ const styles = StyleSheet.create({
     fontSize: 8,
     fontWeight: 'bold',
   },
+  // Queue with Drag & Drop
   queueContainer: {
     flex: 1,
-    paddingHorizontal: 16,
     paddingBottom: 16,
+  },
+  dragListContainer: {
+    paddingHorizontal: 16,
   },
   queueItem: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingVertical: 12,
+    paddingVertical: 10,
     paddingHorizontal: 8,
     borderRadius: 8,
     marginBottom: 4,
+  },
+  dragHandle: {
+    paddingRight: 8,
+    paddingVertical: 8,
+    justifyContent: 'center',
+    alignItems: 'center',
   },
   queueItemInfo: {
     flex: 1,
@@ -422,13 +712,6 @@ const styles = StyleSheet.create({
   },
   queueItemArtist: {
     fontSize: 14,
-  },
-  queueItemActions: {
-    flexDirection: 'column',
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingLeft: 8,
-    gap: 2,
   },
   // Tablet styles
   tabletContent: {

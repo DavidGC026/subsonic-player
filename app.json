@@ -43,7 +43,8 @@
     },
     "plugins": [
       "expo-font",
-      "expo-dev-client"
+      "expo-dev-client",
+      "expo-screen-orientation"
     ],
     "extra": {
       "eas": {
