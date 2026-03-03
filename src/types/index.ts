@@ -5,6 +5,7 @@ export interface ServerConfig {
   username: string;
   password: string;
   useLegacyAuth?: boolean;
+  apiVersion?: string; // Subsonic API version, defaults to '1.16.1'
 }
 
 export interface SubsonicResponse {

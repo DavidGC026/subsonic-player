@@ -1,7 +1,7 @@
 import React from 'react';
 import { View, Text, StyleSheet, Modal, TouchableOpacity, TouchableWithoutFeedback, ActivityIndicator } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { useMusicStore, useDownloadStore } from '../store';
+import { usePlayerStore, useDownloadStore } from '../store';
 import type { Song } from '../types';
 import { AlbumArt } from './AlbumArt';
 
@@ -13,8 +13,8 @@ interface Props {
 }
 
 export const SongOptionsModal: React.FC<Props> = React.memo(({ visible, song, onClose, onAddToPlaylist }) => {
-    const addToQueue = useMusicStore(state => state.addToQueue);
-    const player = useMusicStore(state => state.player);
+    const addToQueue = usePlayerStore(state => state.addToQueue);
+    const player = usePlayerStore(state => state.player);
     const { downloadSong, removeDownload, isDownloaded, currentDownload } = useDownloadStore();
 
     if (!song) return null;
@@ -23,7 +23,7 @@ export const SongOptionsModal: React.FC<Props> = React.memo(({ visible, song, on
     const isCurrentlyDownloading = currentDownload?.songId === song.id;
 
     const handlePlayNext = () => {
-        useMusicStore.getState().addNext(song);
+        usePlayerStore.getState().addNext(song);
         onClose();
     };
 

@@ -11,7 +11,7 @@ import {
   Alert,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { useMusicStore, useThemeStore, useConfigStore, useDownloadStore } from '../store';
+import { usePlayerStore, useLibraryStore, useThemeStore, useConfigStore, useDownloadStore } from '../store';
 import { AlbumCard, ArtistCard, SongItem } from '../components';
 import type { Album, Artist, Song } from '../types';
 import { useIsTablet } from '../hooks/useIsTablet';
@@ -44,9 +44,9 @@ export const LibraryScreen: React.FC<LibraryScreenProps> = ({ navigation, route 
     fetchArtists,
     fetchPlaylists,
     fetchAlbumSongs,
-    playSong,
     customPlaylistImages,
-  } = useMusicStore();
+  } = useLibraryStore();
+  const { playSong } = usePlayerStore();
 
   const { downloadedSongs, removeDownload, removeAllDownloads, getTotalSize } = useDownloadStore();
   const { isConfigured } = useConfigStore();

@@ -1,6 +1,6 @@
 import React from 'react';
 import { View, Text, TouchableOpacity, StyleSheet, Dimensions } from 'react-native';
-import { useMusicStore, useThemeStore } from '../store';
+import { usePlayerStore, useThemeStore } from '../store';
 import { AlbumArt } from './AlbumArt';
 import { ThemeIcon } from './ThemeIcon';
 
@@ -11,7 +11,7 @@ interface MiniPlayerProps {
 }
 
 export const MiniPlayer: React.FC<MiniPlayerProps> = ({ onPress }) => {
-  const { player, togglePlay, playNext } = useMusicStore();
+  const { player, togglePlay, playNext } = usePlayerStore();
   const { currentTheme } = useThemeStore();
   const { currentSong, isPlaying } = player;
 

@@ -9,7 +9,7 @@ import {
     Alert,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { useMusicStore, useThemeStore, useModalStore, useDownloadStore } from '../store';
+import { usePlayerStore, useLibraryStore, useThemeStore, useModalStore, useDownloadStore } from '../store';
 import { SongItem, PlaylistEditModal, PlaylistAddSongsModal } from '../components';
 import type { Song, Playlist } from '../types';
 import { subsonicApi } from '../api/subsonic';
@@ -29,7 +29,8 @@ export const PlaylistDetailScreen: React.FC<PlaylistDetailScreenProps> = ({ navi
     const [isEditModalVisible, setIsEditModalVisible] = useState(false);
     const [isAddSongsModalVisible, setIsAddSongsModalVisible] = useState(false);
 
-    const { playSong, customPlaylistImages, removeSongFromPlaylist } = useMusicStore();
+    const { playSong } = usePlayerStore();
+    const { customPlaylistImages, removeSongFromPlaylist } = useLibraryStore();
     const setOptionsModalSong = useModalStore(state => state.setOptionsModalSong);
     const { currentTheme } = useThemeStore();
 
@@ -119,7 +120,7 @@ export const PlaylistDetailScreen: React.FC<PlaylistDetailScreenProps> = ({ navi
                 {
                     text: "Añadir a la cola",
                     onPress: () => {
-                        useMusicStore.getState().addToQueue(song);
+                        usePlayerStore.getState().addToQueue(song);
                     }
                 },
                 {

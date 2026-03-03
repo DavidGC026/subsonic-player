@@ -13,7 +13,7 @@ import {
 
 import { useIsTablet } from '../hooks/useIsTablet';
 import { Ionicons } from '@expo/vector-icons';
-import { useMusicStore, useConfigStore, useThemeStore } from '../store';
+import { usePlayerStore, useLibraryStore, useConfigStore, useThemeStore } from '../store';
 import { AlbumCard, ArtistCard } from '../components';
 import type { Album, Artist, Playlist } from '../types';
 import { subsonicApi } from '../api/subsonic';
@@ -32,9 +32,9 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
     fetchAlbums,
     fetchArtists,
     fetchPlaylists,
-    playSong,
     customPlaylistImages,
-  } = useMusicStore();
+  } = useLibraryStore();
+  const { playSong } = usePlayerStore();
 
   const { isConfigured } = useConfigStore();
   const [refreshing, setRefreshing] = React.useState(false);

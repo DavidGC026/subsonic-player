@@ -10,7 +10,7 @@ import {
   ActivityIndicator,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { useMusicStore, useThemeStore, useModalStore } from '../store';
+import { usePlayerStore, useThemeStore, useModalStore } from '../store';
 import { AlbumArt, AlbumCard } from '../components';
 import type { Album, Artist, Song } from '../types';
 import { subsonicApi } from '../api/subsonic';
@@ -33,7 +33,7 @@ export const ArtistDetailScreen: React.FC<ArtistDetailScreenProps> = ({ navigati
   const [showOptionsMenu, setShowOptionsMenu] = useState(false);
   const [isLoadingAllSongs, setIsLoadingAllSongs] = useState(false);
 
-  const { playSong, addToQueue } = useMusicStore();
+  const { playSong, addToQueue } = usePlayerStore();
   const setPlaylistModalSongs = useModalStore(state => state.setPlaylistModalSongs);
   const { currentTheme } = useThemeStore();
   const { isTablet, getColumns, getSize } = useIsTablet();

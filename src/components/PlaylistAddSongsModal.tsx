@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { View, Text, StyleSheet, Modal, TouchableOpacity, TouchableWithoutFeedback, TextInput, FlatList, ActivityIndicator } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { useMusicStore } from '../store';
+import { useLibraryStore } from '../store';
 import type { Song } from '../types';
 import { SongItem } from './SongItem';
 
@@ -12,7 +12,7 @@ interface Props {
 }
 
 export const PlaylistAddSongsModal: React.FC<Props> = ({ visible, playlistId, onClose }) => {
-    const { search, addSongToPlaylist } = useMusicStore();
+    const { search, addSongToPlaylist } = useLibraryStore();
     const [query, setQuery] = useState('');
     const [results, setResults] = useState<Song[]>([]);
     const [isSearching, setIsSearching] = useState(false);

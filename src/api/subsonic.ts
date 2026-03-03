@@ -10,9 +10,15 @@ import type {
   SearchResult,
 } from '../types';
 
+const DEFAULT_API_VERSION = '1.16.1';
+
 class SubsonicAPI {
   private config: ServerConfig | null = null;
   private salt: string = '';
+
+  private get apiVersion(): string {
+    return this.config?.apiVersion || DEFAULT_API_VERSION;
+  }
 
   setConfig(config: ServerConfig) {
     this.config = config;
@@ -67,7 +73,7 @@ class SubsonicAPI {
     const authParams = this.getAuthParams();
     const queryParams = new URLSearchParams({
       ...authParams,
-      v: '1.16.1',
+      v: this.apiVersion,
       c: 'subsonic-player',
       f: 'json',
       ...Object.fromEntries(
@@ -120,7 +126,7 @@ class SubsonicAPI {
     const authParams = this.getAuthParams();
     const queryParams = new URLSearchParams({
       ...authParams,
-      v: '1.16.1',
+      v: this.apiVersion,
       c: 'subsonic-player',
       id: songId,
     });
@@ -137,7 +143,7 @@ class SubsonicAPI {
     const authParams = this.getAuthParams();
     const queryParams = new URLSearchParams({
       ...authParams,
-      v: '1.16.1',
+      v: this.apiVersion,
       c: 'subsonic-player',
       id: coverArtId,
       size: String(size),

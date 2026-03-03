@@ -10,7 +10,7 @@ import {
   ScrollView,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { useMusicStore, useConfigStore, useThemeStore } from '../store';
+import { usePlayerStore, useLibraryStore, useConfigStore, useThemeStore } from '../store';
 import { AlbumCard, ArtistCard, SongItem } from '../components';
 import type { Album, Artist, Song } from '../types';
 
@@ -28,7 +28,8 @@ export const SearchScreen: React.FC<SearchScreenProps> = ({ navigation }) => {
   const [isSearching, setIsSearching] = useState(false);
   const [hasSearched, setHasSearched] = useState(false);
 
-  const { search, playSong } = useMusicStore();
+  const { search } = useLibraryStore();
+  const { playSong } = usePlayerStore();
   const { isConfigured } = useConfigStore();
   const { currentTheme } = useThemeStore();
 

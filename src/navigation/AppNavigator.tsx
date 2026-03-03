@@ -17,7 +17,7 @@ import {
   ThemesScreen,
 } from '../screens';
 import { MiniPlayer, FullPlayer, SongOptionsModal, PlaylistSelectModal, AnimatedBackground } from '../components';
-import { useMusicStore, useConfigStore, useThemeStore, useModalStore } from '../store';
+import { usePlayerStore, useLibraryStore, useConfigStore, useThemeStore, useModalStore } from '../store';
 
 // Type definitions
 export type RootStackParamList = {
@@ -105,7 +105,7 @@ const MainTabNavigator: React.FC = () => {
 export const AppNavigator: React.FC = () => {
   const [playerVisible, setPlayerVisible] = useState(false);
   const { isConfigured, loadConfig } = useConfigStore();
-  const player = useMusicStore(state => state.player);
+  const player = usePlayerStore(state => state.player);
   const { currentTheme } = useThemeStore();
 
   // Modal state from isolated store — no contamination of musicStore
@@ -116,7 +116,7 @@ export const AppNavigator: React.FC = () => {
 
   useEffect(() => {
     loadConfig();
-    useMusicStore.getState().loadCustomPlaylistImages();
+    useLibraryStore.getState().loadCustomPlaylistImages();
   }, []);
 
   const NavigatorContent = (

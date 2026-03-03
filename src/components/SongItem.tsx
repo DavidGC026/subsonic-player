@@ -3,7 +3,7 @@ import { View, Text, TouchableOpacity, StyleSheet, InteractionManager } from 're
 import { Ionicons } from '@expo/vector-icons';
 import { AlbumArt } from './AlbumArt';
 import type { Song } from '../types';
-import { useMusicStore, useThemeStore, useDownloadStore } from '../store';
+import { usePlayerStore, useThemeStore, useDownloadStore } from '../store';
 import { useModalStore } from '../store/modalStore';
 
 interface SongItemProps {
@@ -49,7 +49,7 @@ export const SongItem: React.FC<SongItemProps> = React.memo(({
   };
 
   const handleStarPress = () => {
-    useMusicStore.getState().toggleStar(song.id, 'song', !!song.starred);
+    usePlayerStore.getState().toggleStar(song.id, 'song', !!song.starred);
   };
 
   return (

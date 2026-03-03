@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { View, Text, StyleSheet, Modal, TouchableOpacity, TouchableWithoutFeedback, FlatList, TextInput } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { useMusicStore } from '../store';
+import { useLibraryStore } from '../store';
 import type { Song } from '../types';
 
 export interface PlaylistSelectModalProps {
@@ -11,7 +11,7 @@ export interface PlaylistSelectModalProps {
 }
 
 export const PlaylistSelectModal: React.FC<PlaylistSelectModalProps> = ({ visible, songs, onClose }) => {
-    const { playlists, fetchPlaylists, createPlaylist, addSongToPlaylist } = useMusicStore();
+    const { playlists, fetchPlaylists, createPlaylist, addSongToPlaylist, addSongsToPlaylist } = useLibraryStore();
     const [isCreating, setIsCreating] = useState(false);
     const [newPlaylistName, setNewPlaylistName] = useState('');
 
@@ -30,16 +30,7 @@ export const PlaylistSelectModal: React.FC<PlaylistSelectModalProps> = ({ visibl
         if (songIds.length === 1) {
             await addSongToPlaylist(playlistId, songIds[0]);
         } else {
-            // musicStore.addSongsToPlaylist should be implemented
-            // if we have implemented it:
-            if (useMusicStore.getState().addSongsToPlaylist) {
-                await useMusicStore.getState().addSongsToPlaylist(playlistId, songIds);
-            } else {
-                // simple fallback if function doesn't exist
-                for (const id of songIds) {
-                    await addSongToPlaylist(playlistId, id);
-                }
-            }
+            await addSongsToPlaylist(playlistId, songIds);
         }
         onClose();
     };

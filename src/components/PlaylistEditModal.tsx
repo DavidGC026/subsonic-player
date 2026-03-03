@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { View, Text, StyleSheet, Modal, TouchableOpacity, TouchableWithoutFeedback, TextInput, Alert, Image, ActivityIndicator } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import * as ImagePicker from 'expo-image-picker';
-import { useMusicStore, useDownloadStore } from '../store';
+import { useLibraryStore, useDownloadStore } from '../store';
 import type { Playlist, Song } from '../types';
 import { subsonicApi } from '../api/subsonic';
 
@@ -16,7 +16,7 @@ interface Props {
 }
 
 export const PlaylistEditModal: React.FC<Props> = ({ visible, playlist, onClose, onDeleted, onAddSongs, songs }) => {
-    const { updatePlaylistName, deletePlaylist, setCustomPlaylistImage, customPlaylistImages } = useMusicStore();
+    const { updatePlaylistName, deletePlaylist, setCustomPlaylistImage, customPlaylistImages } = useLibraryStore();
     const { downloadPlaylist, removeDownload, isDownloaded, playlistDownloadProgress, cancelPlaylistDownload } = useDownloadStore();
     const [isEditing, setIsEditing] = useState(false);
     const [newName, setNewName] = useState('');

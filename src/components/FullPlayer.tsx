@@ -10,7 +10,7 @@ import {
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { CustomSlider } from './CustomSlider';
-import { useMusicStore, useThemeStore } from '../store';
+import { usePlayerStore, useThemeStore } from '../store';
 import { AlbumArt } from './AlbumArt';
 import { ThemeIcon } from './ThemeIcon';
 import { AnimatedBackground } from './AnimatedBackground';
@@ -41,7 +41,7 @@ export const FullPlayer: React.FC<FullPlayerProps> = ({ onClose }) => {
     seekTo,
     playSong,
     reorderQueue,
-  } = useMusicStore();
+  } = usePlayerStore();
 
   const { currentSong, isPlaying, position, duration, repeatMode, shuffleMode, volume, queue, currentIndex } = player;
   const [isSeeking, setIsSeeking] = useState(false);
@@ -167,7 +167,7 @@ export const FullPlayer: React.FC<FullPlayerProps> = ({ onClose }) => {
                   <Text style={[styles.title, { color: currentTheme.colors.text }]} numberOfLines={1}>{currentSong.title}</Text>
                   <Text style={[styles.artist, { color: currentTheme.colors.textSecondary }]} numberOfLines={1}>{currentSong.artist} • {currentSong.album}</Text>
                 </View>
-                <TouchableOpacity style={styles.starButton} onPress={() => useMusicStore.getState().toggleStar(currentSong.id, 'song', !!currentSong.starred)} hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}>
+                <TouchableOpacity style={styles.starButton} onPress={() => usePlayerStore.getState().toggleStar(currentSong.id, 'song', !!currentSong.starred)} hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}>
                   <Ionicons name={currentSong.starred ? "heart" : "heart-outline"} size={28} color={currentSong.starred ? currentTheme.colors.primary : currentTheme.colors.text} />
                 </TouchableOpacity>
               </View>
@@ -225,7 +225,7 @@ export const FullPlayer: React.FC<FullPlayerProps> = ({ onClose }) => {
                 <Text style={[styles.title, { color: currentTheme.colors.text }]} numberOfLines={1} ellipsizeMode="tail">{currentSong.title}</Text>
                 <Text style={[styles.artist, { color: currentTheme.colors.textSecondary }]} numberOfLines={1} ellipsizeMode="tail">{currentSong.artist} • {currentSong.album}</Text>
               </View>
-              <TouchableOpacity style={styles.starButton} onPress={() => useMusicStore.getState().toggleStar(currentSong.id, 'song', !!currentSong.starred)} hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}>
+              <TouchableOpacity style={styles.starButton} onPress={() => usePlayerStore.getState().toggleStar(currentSong.id, 'song', !!currentSong.starred)} hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}>
                 <Ionicons name={currentSong.starred ? "heart" : "heart-outline"} size={28} color={currentSong.starred ? currentTheme.colors.primary : currentTheme.colors.text} />
               </TouchableOpacity>
             </View>
