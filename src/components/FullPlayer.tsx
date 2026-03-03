@@ -14,6 +14,7 @@ import { useMusicStore, useThemeStore } from '../store';
 import { AlbumArt } from './AlbumArt';
 import { ThemeIcon } from './ThemeIcon';
 import { AnimatedBackground } from './AnimatedBackground';
+import { useIsTablet } from '../hooks/useIsTablet';
 
 const { width: screenWidth, height: screenHeight } = Dimensions.get('window');
 
@@ -47,6 +48,8 @@ export const FullPlayer: React.FC<FullPlayerProps> = ({ onClose }) => {
   const [seekPosition, setSeekPosition] = useState(0);
   const [showQueue, setShowQueue] = useState(false);
   const { currentTheme } = useThemeStore();
+  const { isTablet, screenWidth } = useIsTablet();
+  const artSize = isTablet ? screenWidth * 0.35 : screenWidth * 0.75;
 
   const handleSeek = useCallback(async (value: number) => {
     await seekTo(value);
@@ -81,7 +84,7 @@ export const FullPlayer: React.FC<FullPlayerProps> = ({ onClose }) => {
           <AnimatedBackground {...currentTheme.flags.animatedBackground} />
         ) : currentTheme.flags?.useBackgroundImage ? (
           <ImageBackground
-            source={require('../../assets/fondo.png')}
+            source={require('../../assets/fondo.jpg')}
             style={StyleSheet.absoluteFill}
             resizeMode="cover"
           >
@@ -153,139 +156,121 @@ export const FullPlayer: React.FC<FullPlayerProps> = ({ onClose }) => {
             showsVerticalScrollIndicator={false}
           />
         </View>
+      ) : isTablet ? (
+        /* Tablet: side-by-side layout */
+        <View style={styles.tabletContent}>
+          <View style={styles.tabletArtSide}>
+            <AlbumArt coverArtId={currentSong.coverArt} size={artSize} borderRadius={12} iconSize={80} />
+            <View style={[styles.infoContainer, { marginTop: 16 }]}>
+              <View style={styles.titleRow}>
+                <View style={styles.titleInfo}>
+                  <Text style={[styles.title, { color: currentTheme.colors.text }]} numberOfLines={1}>{currentSong.title}</Text>
+                  <Text style={[styles.artist, { color: currentTheme.colors.textSecondary }]} numberOfLines={1}>{currentSong.artist} • {currentSong.album}</Text>
+                </View>
+                <TouchableOpacity style={styles.starButton} onPress={() => useMusicStore.getState().toggleStar(currentSong.id, 'song', !!currentSong.starred)} hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}>
+                  <Ionicons name={currentSong.starred ? "heart" : "heart-outline"} size={28} color={currentSong.starred ? currentTheme.colors.primary : currentTheme.colors.text} />
+                </TouchableOpacity>
+              </View>
+            </View>
+          </View>
+          <View style={styles.tabletControlsSide}>
+            <View style={styles.progressContainer}>
+              <CustomSlider style={styles.slider} minimumValue={0} maximumValue={displayDuration} value={displayPosition} onSlidingStart={handleSlidingStart} onSlidingComplete={handleSlidingComplete} onValueChange={handleValueChange} minimumTrackTintColor={currentTheme.colors.primary} maximumTrackTintColor={currentTheme.colors.surface} thumbTintColor={currentTheme.colors.text} />
+              <View style={styles.timeContainer}>
+                <Text style={[styles.timeText, { color: currentTheme.colors.textSecondary }]}>{formatTime(displayPosition)}</Text>
+                <Text style={[styles.timeText, { color: currentTheme.colors.textSecondary }]}>{formatTime(displayDuration)}</Text>
+              </View>
+            </View>
+            <View style={styles.controlsContainer}>
+              <TouchableOpacity style={styles.secondaryControl} onPress={toggleShuffle}>
+                <ThemeIcon name="shuffle" size={24} color={shuffleMode ? currentTheme.colors.primary : currentTheme.colors.textSecondary} />
+              </TouchableOpacity>
+              <TouchableOpacity style={styles.mainControl} onPress={playPrevious}>
+                <ThemeIcon name="play-skip-back" size={35} color={currentTheme.colors.text} />
+              </TouchableOpacity>
+              <TouchableOpacity style={styles.playButton} onPress={togglePlay}>
+                <View style={[styles.playButtonBackground, { backgroundColor: currentTheme.colors.text }]}>
+                  <ThemeIcon name={isPlaying ? 'pause' : 'play'} size={40} color={currentTheme.colors.background} style={isPlaying ? {} : { marginLeft: 4 }} />
+                </View>
+              </TouchableOpacity>
+              <TouchableOpacity style={styles.mainControl} onPress={playNext}>
+                <ThemeIcon name="play-skip-forward" size={35} color={currentTheme.colors.text} />
+              </TouchableOpacity>
+              <TouchableOpacity style={styles.secondaryControl} onPress={() => setRepeatMode(repeatMode === 'none' ? 'all' : repeatMode === 'all' ? 'one' : 'none')}>
+                <ThemeIcon name="repeat" size={24} color={repeatMode !== 'none' ? currentTheme.colors.primary : currentTheme.colors.textSecondary} />
+                {repeatMode === 'one' && (
+                  <View style={[styles.repeatOneBadge, { backgroundColor: currentTheme.colors.primary }]}>
+                    <Text style={[styles.repeatOneText, { color: currentTheme.colors.background }]}>1</Text>
+                  </View>
+                )}
+              </TouchableOpacity>
+            </View>
+            <View style={styles.volumeContainer}>
+              <Ionicons name="volume-low" size={20} color={currentTheme.colors.textSecondary} />
+              <CustomSlider style={styles.volumeSlider} minimumValue={0} maximumValue={1} value={volume} onValueChange={setVolume} minimumTrackTintColor={currentTheme.colors.text} maximumTrackTintColor={currentTheme.colors.surface} thumbTintColor={currentTheme.colors.text} />
+              <Ionicons name="volume-high" size={20} color={currentTheme.colors.textSecondary} />
+            </View>
+          </View>
+        </View>
       ) : (
         <>
-          {/* Album Art */}
+          {/* Phone: vertical layout */}
           <View style={styles.artContainer}>
-            <AlbumArt
-              coverArtId={currentSong.coverArt}
-              size={screenWidth * 0.75}
-              borderRadius={12}
-              iconSize={80}
-            />
+            <AlbumArt coverArtId={currentSong.coverArt} size={artSize} borderRadius={12} iconSize={80} />
           </View>
 
           <View style={styles.infoContainer}>
             <View style={styles.titleRow}>
               <View style={styles.titleInfo}>
-                <Text style={[styles.title, { color: currentTheme.colors.text }]} numberOfLines={1} ellipsizeMode="tail">
-                  {currentSong.title}
-                </Text>
-                <Text style={[styles.artist, { color: currentTheme.colors.textSecondary }]} numberOfLines={1} ellipsizeMode="tail">
-                  {currentSong.artist} • {currentSong.album}
-                </Text>
+                <Text style={[styles.title, { color: currentTheme.colors.text }]} numberOfLines={1} ellipsizeMode="tail">{currentSong.title}</Text>
+                <Text style={[styles.artist, { color: currentTheme.colors.textSecondary }]} numberOfLines={1} ellipsizeMode="tail">{currentSong.artist} • {currentSong.album}</Text>
               </View>
-              <TouchableOpacity
-                style={styles.starButton}
-                onPress={() => useMusicStore.getState().toggleStar(currentSong.id, 'song', !!currentSong.starred)}
-                hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
-              >
-                <Ionicons
-                  name={currentSong.starred ? "heart" : "heart-outline"}
-                  size={28}
-                  color={currentSong.starred ? currentTheme.colors.primary : currentTheme.colors.text}
-                />
+              <TouchableOpacity style={styles.starButton} onPress={() => useMusicStore.getState().toggleStar(currentSong.id, 'song', !!currentSong.starred)} hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}>
+                <Ionicons name={currentSong.starred ? "heart" : "heart-outline"} size={28} color={currentSong.starred ? currentTheme.colors.primary : currentTheme.colors.text} />
               </TouchableOpacity>
             </View>
           </View>
+
+          <View style={styles.progressContainer}>
+            <CustomSlider style={styles.slider} minimumValue={0} maximumValue={displayDuration} value={displayPosition} onSlidingStart={handleSlidingStart} onSlidingComplete={handleSlidingComplete} onValueChange={handleValueChange} minimumTrackTintColor={currentTheme.colors.primary} maximumTrackTintColor={currentTheme.colors.surface} thumbTintColor={currentTheme.colors.text} />
+            <View style={styles.timeContainer}>
+              <Text style={[styles.timeText, { color: currentTheme.colors.textSecondary }]}>{formatTime(displayPosition)}</Text>
+              <Text style={[styles.timeText, { color: currentTheme.colors.textSecondary }]}>{formatTime(displayDuration)}</Text>
+            </View>
+          </View>
+
+          <View style={styles.controlsContainer}>
+            <TouchableOpacity style={styles.secondaryControl} onPress={toggleShuffle}>
+              <ThemeIcon name="shuffle" size={24} color={shuffleMode ? currentTheme.colors.primary : currentTheme.colors.textSecondary} />
+            </TouchableOpacity>
+            <TouchableOpacity style={styles.mainControl} onPress={playPrevious}>
+              <ThemeIcon name="play-skip-back" size={35} color={currentTheme.colors.text} />
+            </TouchableOpacity>
+            <TouchableOpacity style={styles.playButton} onPress={togglePlay}>
+              <View style={[styles.playButtonBackground, { backgroundColor: currentTheme.colors.text }]}>
+                <ThemeIcon name={isPlaying ? 'pause' : 'play'} size={40} color={currentTheme.colors.background} style={isPlaying ? {} : { marginLeft: 4 }} />
+              </View>
+            </TouchableOpacity>
+            <TouchableOpacity style={styles.mainControl} onPress={playNext}>
+              <ThemeIcon name="play-skip-forward" size={35} color={currentTheme.colors.text} />
+            </TouchableOpacity>
+            <TouchableOpacity style={styles.secondaryControl} onPress={() => setRepeatMode(repeatMode === 'none' ? 'all' : repeatMode === 'all' ? 'one' : 'none')}>
+              <ThemeIcon name="repeat" size={24} color={repeatMode !== 'none' ? currentTheme.colors.primary : currentTheme.colors.textSecondary} />
+              {repeatMode === 'one' && (
+                <View style={[styles.repeatOneBadge, { backgroundColor: currentTheme.colors.primary }]}>
+                  <Text style={[styles.repeatOneText, { color: currentTheme.colors.background }]}>1</Text>
+                </View>
+              )}
+            </TouchableOpacity>
+          </View>
+
+          <View style={styles.volumeContainer}>
+            <Ionicons name="volume-low" size={20} color={currentTheme.colors.textSecondary} />
+            <CustomSlider style={styles.volumeSlider} minimumValue={0} maximumValue={1} value={volume} onValueChange={setVolume} minimumTrackTintColor={currentTheme.colors.text} maximumTrackTintColor={currentTheme.colors.surface} thumbTintColor={currentTheme.colors.text} />
+            <Ionicons name="volume-high" size={20} color={currentTheme.colors.textSecondary} />
+          </View>
         </>
       )}
-
-      {/* Progress Bar */}
-      <View style={styles.progressContainer}>
-        <CustomSlider
-          style={styles.slider}
-          minimumValue={0}
-          maximumValue={displayDuration}
-          value={displayPosition}
-          onSlidingStart={handleSlidingStart}
-          onSlidingComplete={handleSlidingComplete}
-          onValueChange={handleValueChange}
-          minimumTrackTintColor={currentTheme.colors.primary}
-          maximumTrackTintColor={currentTheme.colors.surface}
-          thumbTintColor={currentTheme.colors.text}
-        />
-        <View style={styles.timeContainer}>
-          <Text style={[styles.timeText, { color: currentTheme.colors.textSecondary }]}>{formatTime(displayPosition)}</Text>
-          <Text style={[styles.timeText, { color: currentTheme.colors.textSecondary }]}>{formatTime(displayDuration)}</Text>
-        </View>
-      </View>
-
-      {/* Controls */}
-      <View style={styles.controlsContainer}>
-        <TouchableOpacity
-          style={styles.secondaryControl}
-          onPress={toggleShuffle}
-        >
-          <ThemeIcon
-            name="shuffle"
-            size={24}
-            color={shuffleMode ? currentTheme.colors.primary : currentTheme.colors.textSecondary}
-          />
-        </TouchableOpacity>
-
-        <TouchableOpacity
-          style={styles.mainControl}
-          onPress={playPrevious}
-        >
-          <ThemeIcon name="play-skip-back" size={35} color={currentTheme.colors.text} />
-        </TouchableOpacity>
-
-        <TouchableOpacity
-          style={styles.playButton}
-          onPress={togglePlay}
-        >
-          <View style={[styles.playButtonBackground, { backgroundColor: currentTheme.colors.text }]}>
-            <ThemeIcon
-              name={isPlaying ? 'pause' : 'play'}
-              size={40}
-              color={currentTheme.colors.background}
-              style={isPlaying ? {} : { marginLeft: 4 }}
-            />
-          </View>
-        </TouchableOpacity>
-
-        <TouchableOpacity
-          style={styles.mainControl}
-          onPress={playNext}
-        >
-          <ThemeIcon name="play-skip-forward" size={35} color={currentTheme.colors.text} />
-        </TouchableOpacity>
-
-        <TouchableOpacity
-          style={styles.secondaryControl}
-          onPress={() => setRepeatMode(
-            repeatMode === 'none' ? 'all' : repeatMode === 'all' ? 'one' : 'none'
-          )}
-        >
-          <ThemeIcon
-            name="repeat"
-            size={24}
-            color={repeatMode !== 'none' ? currentTheme.colors.primary : currentTheme.colors.textSecondary}
-          />
-          {repeatMode === 'one' && (
-            <View style={[styles.repeatOneBadge, { backgroundColor: currentTheme.colors.primary }]}>
-              <Text style={[styles.repeatOneText, { color: currentTheme.colors.background }]}>1</Text>
-            </View>
-          )}
-        </TouchableOpacity>
-      </View>
-
-      {/* Volume Control */}
-      <View style={styles.volumeContainer}>
-        <Ionicons name="volume-low" size={20} color={currentTheme.colors.textSecondary} />
-        <CustomSlider
-          style={styles.volumeSlider}
-          minimumValue={0}
-          maximumValue={1}
-          value={volume}
-          onValueChange={setVolume}
-          minimumTrackTintColor={currentTheme.colors.text}
-          maximumTrackTintColor={currentTheme.colors.surface}
-          thumbTintColor={currentTheme.colors.text}
-        />
-        <Ionicons name="volume-high" size={20} color={currentTheme.colors.textSecondary} />
-      </View>
     </View>
   );
 };
@@ -444,6 +429,24 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     paddingLeft: 8,
     gap: 2,
+  },
+  // Tablet styles
+  tabletContent: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 32,
+    gap: 32,
+  },
+  tabletArtSide: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  tabletControlsSide: {
+    flex: 1,
+    justifyContent: 'center',
+    paddingVertical: 24,
   },
 });
 

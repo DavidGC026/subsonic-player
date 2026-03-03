@@ -8,11 +8,10 @@ import {
   TouchableOpacity,
   Image,
   Dimensions,
+  useWindowDimensions,
 } from 'react-native';
 
-const { width: screenWidth } = Dimensions.get('window');
-// 3 columns: 32px total screen padding + 36px total margins (12px * 3 cards)
-const gridItemWidth = (screenWidth - 32 - 36) / 3;
+import { useIsTablet } from '../hooks/useIsTablet';
 import { Ionicons } from '@expo/vector-icons';
 import { useMusicStore, useConfigStore, useThemeStore } from '../store';
 import { AlbumCard, ArtistCard } from '../components';
@@ -41,6 +40,13 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
   const [refreshing, setRefreshing] = React.useState(false);
   const [frequentAlbums, setFrequentAlbums] = React.useState<Album[]>([]);
   const { currentTheme } = useThemeStore();
+  const { isTablet, screenWidth, getSize, getColumns } = useIsTablet();
+
+  const gridCols = getColumns(3, 5);
+  const gridItemWidth = (screenWidth - 32 - (12 * gridCols)) / gridCols;
+  const albumCardSize = getSize(150, 200);
+  const artistCardSize = getSize(130, 160);
+  const playlistCardWidth = getSize(140, 180);
 
   useEffect(() => {
     if (isConfigured) {
@@ -196,7 +202,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
                 key={`${album.id}-${index}`}
                 album={album}
                 onPress={handleAlbumPress}
-                size={150}
+                size={albumCardSize}
               />
             ))
           ) : (
@@ -229,7 +235,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
                 key={`${artist.id}-${index}`}
                 artist={artist}
                 onPress={handleArtistPress}
-                size={130}
+                size={artistCardSize}
               />
             ))
           ) : (
@@ -255,7 +261,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
                 key={`freq-${album.id}-${index}`}
                 album={album}
                 onPress={handleAlbumPress}
-                size={150}
+                size={albumCardSize}
               />
             ))}
           </ScrollView>

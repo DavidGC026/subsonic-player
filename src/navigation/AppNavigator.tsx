@@ -4,6 +4,7 @@ import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { Ionicons } from '@expo/vector-icons';
 import { View, StyleSheet, Modal, ImageBackground } from 'react-native';
+import { SafeAreaProvider, useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import {
   HomeScreen,
@@ -41,6 +42,8 @@ const Tab = createBottomTabNavigator<MainTabParamList>();
 // Main Tab Navigator
 const MainTabNavigator: React.FC = () => {
   const { currentTheme } = useThemeStore();
+  const insets = useSafeAreaInsets();
+  const bottomPadding = Math.max(insets.bottom, 8);
 
   return (
     <Tab.Navigator
@@ -50,9 +53,9 @@ const MainTabNavigator: React.FC = () => {
           backgroundColor: currentTheme.colors.background,
           borderTopColor: currentTheme.flags?.useGlassmorphism ? 'rgba(255,255,255,0.1)' : currentTheme.colors.surface,
           borderTopWidth: 1,
-          paddingBottom: 8,
+          paddingBottom: bottomPadding,
           paddingTop: 8,
-          height: 60,
+          height: 60 + bottomPadding,
           position: currentTheme.flags?.useGlassmorphism ? 'absolute' : 'relative',
           elevation: 0,
         },
@@ -205,26 +208,28 @@ export const AppNavigator: React.FC = () => {
   };
 
   return (
-    <NavigationContainer theme={navTheme}>
-      {currentTheme.flags?.animatedBackground ? (
-        <View style={styles.container}>
-          <AnimatedBackground {...currentTheme.flags.animatedBackground} />
-          {NavigatorContent}
-        </View>
-      ) : currentTheme.flags?.useBackgroundImage ? (
-        <ImageBackground
-          source={require('../../assets/fondo.png')}
-          style={styles.container}
-          resizeMode="cover"
-        >
-          {NavigatorContent}
-        </ImageBackground>
-      ) : (
-        <View style={styles.container}>
-          {NavigatorContent}
-        </View>
-      )}
-    </NavigationContainer>
+    <SafeAreaProvider>
+      <NavigationContainer theme={navTheme}>
+        {currentTheme.flags?.animatedBackground ? (
+          <View style={styles.container}>
+            <AnimatedBackground {...currentTheme.flags.animatedBackground} />
+            {NavigatorContent}
+          </View>
+        ) : currentTheme.flags?.useBackgroundImage ? (
+          <ImageBackground
+            source={require('../../assets/fondo.jpg')}
+            style={styles.container}
+            resizeMode="cover"
+          >
+            {NavigatorContent}
+          </ImageBackground>
+        ) : (
+          <View style={styles.container}>
+            {NavigatorContent}
+          </View>
+        )}
+      </NavigationContainer>
+    </SafeAreaProvider>
   );
 };
 

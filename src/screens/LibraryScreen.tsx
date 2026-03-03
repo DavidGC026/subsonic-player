@@ -14,6 +14,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { useMusicStore, useThemeStore, useConfigStore, useDownloadStore } from '../store';
 import { AlbumCard, ArtistCard, SongItem } from '../components';
 import type { Album, Artist, Song } from '../types';
+import { useIsTablet } from '../hooks/useIsTablet';
 
 type LibraryTab = 'albums' | 'artists' | 'songs' | 'playlists' | 'downloads';
 
@@ -53,6 +54,10 @@ export const LibraryScreen: React.FC<LibraryScreenProps> = ({ navigation, route 
   const [songs, setSongs] = useState<Song[]>([]);
   const [isLoadingSongs, setIsLoadingSongs] = useState(false);
   const { currentTheme } = useThemeStore();
+  const { isTablet, screenWidth, getColumns, getSize } = useIsTablet();
+
+  const numColumns = getColumns(2, 4);
+  const cardSize = getSize(160, 180);
 
   useEffect(() => {
     if (isConfigured) {
@@ -178,17 +183,18 @@ export const LibraryScreen: React.FC<LibraryScreenProps> = ({ navigation, route 
 
   const renderAlbums = () => (
     <FlatList
+      key={`albums-${numColumns}`}
       data={albums}
       keyExtractor={(item, index) => `${item.id}-${index}`}
-      numColumns={2}
+      numColumns={numColumns}
       contentContainerStyle={styles.gridContent}
       columnWrapperStyle={styles.columnWrapper}
       refreshControl={
         <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor="#B22222" />
       }
       renderItem={({ item }) => (
-        <View style={styles.gridItem}>
-          <AlbumCard album={item} onPress={handleAlbumPress} size={160} />
+        <View style={[styles.gridItem, { width: `${Math.floor(100 / numColumns) - 2}%` }]}>
+          <AlbumCard album={item} onPress={handleAlbumPress} size={cardSize} />
         </View>
       )}
       ListEmptyComponent={
@@ -201,17 +207,18 @@ export const LibraryScreen: React.FC<LibraryScreenProps> = ({ navigation, route 
 
   const renderArtists = () => (
     <FlatList
+      key={`artists-${numColumns}`}
       data={artists}
       keyExtractor={(item, index) => `${item.id}-${index}`}
-      numColumns={2}
+      numColumns={numColumns}
       contentContainerStyle={styles.gridContent}
       columnWrapperStyle={styles.columnWrapper}
       refreshControl={
         <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor="#B22222" />
       }
       renderItem={({ item }) => (
-        <View style={styles.gridItem}>
-          <ArtistCard artist={item} onPress={handleArtistPress} size={160} />
+        <View style={[styles.gridItem, { width: `${Math.floor(100 / numColumns) - 2}%` }]}>
+          <ArtistCard artist={item} onPress={handleArtistPress} size={cardSize} />
         </View>
       )}
       ListEmptyComponent={

@@ -149,15 +149,44 @@ class SubsonicAPI {
   // Get all artists
   async getArtists(): Promise<Artist[]> {
     const response = await this.request<{ artists: { index: Array<{ artist: Artist[] }> } }>('getArtists');
-    const artists: Artist[] = [];
+    const rawArtists: Artist[] = [];
 
     response.artists?.index?.forEach((index) => {
       if (Array.isArray(index.artist)) {
-        artists.push(...index.artist);
+        rawArtists.push(...index.artist);
       }
     });
 
-    return artists;
+    // Split multi-artist entries into individual artists
+    // Common separators: ", ", " / ", " & ", " feat. ", " ft. ", " x ", " y "
+    const splitRegex = /\s*[,\/&]\s*|\s+feat\.?\s+|\s+ft\.?\s+|\s+x\s+|\s+y\s+/i;
+    const artistMap = new Map<string, Artist>();
+
+    for (const artist of rawArtists) {
+      const parts = artist.name.split(splitRegex).map(s => s.trim()).filter(s => s.length > 0);
+
+      if (parts.length <= 1) {
+        // Single artist, keep as-is
+        if (!artistMap.has(artist.name.toLowerCase())) {
+          artistMap.set(artist.name.toLowerCase(), artist);
+        }
+      } else {
+        // Multi-artist: create an entry for each individual name
+        for (const part of parts) {
+          const key = part.toLowerCase();
+          if (!artistMap.has(key)) {
+            artistMap.set(key, {
+              id: artist.id, // Keep original combined ID for fetching albums
+              name: part,
+              coverArt: artist.coverArt,
+              albumCount: artist.albumCount,
+            });
+          }
+        }
+      }
+    }
+
+    return Array.from(artistMap.values()).sort((a, b) => a.name.localeCompare(b.name));
   }
 
   // Get all albums

@@ -14,6 +14,7 @@ import { useMusicStore, useThemeStore, useModalStore } from '../store';
 import { AlbumArt, AlbumCard } from '../components';
 import type { Album, Artist, Song } from '../types';
 import { subsonicApi } from '../api/subsonic';
+import { useIsTablet } from '../hooks/useIsTablet';
 
 const { width: screenWidth } = Dimensions.get('window');
 
@@ -35,6 +36,9 @@ export const ArtistDetailScreen: React.FC<ArtistDetailScreenProps> = ({ navigati
   const { playSong, addToQueue } = useMusicStore();
   const setPlaylistModalSongs = useModalStore(state => state.setPlaylistModalSongs);
   const { currentTheme } = useThemeStore();
+  const { isTablet, getColumns, getSize } = useIsTablet();
+  const numColumns = getColumns(2, 3);
+  const cardSize = getSize(160, 200);
 
   useEffect(() => {
     loadArtistDetails();
@@ -46,8 +50,32 @@ export const ArtistDetailScreen: React.FC<ArtistDetailScreenProps> = ({ navigati
     setIsLoading(true);
     try {
       const { artist: artistData, albums: artistAlbums } = await subsonicApi.getArtist(artistId);
-      setArtist(artistData);
-      setAlbums(artistAlbums);
+
+      // If artistName was passed (from split multi-artist), also search for 
+      // additional albums where this artist participates
+      let allAlbums = [...artistAlbums];
+
+      if (artistName) {
+        try {
+          const searchResults = await subsonicApi.search(artistName);
+          if (searchResults.album) {
+            const existingIds = new Set(allAlbums.map(a => a.id));
+            for (const album of searchResults.album) {
+              // Only add if the album artist contains our artist name and isn't already in the list
+              if (!existingIds.has(album.id) && album.artist?.toLowerCase().includes(artistName.toLowerCase())) {
+                allAlbums.push(album);
+                existingIds.add(album.id);
+              }
+            }
+          }
+        } catch (searchError) {
+          // Search failed, continue with original albums
+          console.log('Search for additional albums failed:', searchError);
+        }
+      }
+
+      setArtist(artistName ? { ...artistData, name: artistName } : artistData);
+      setAlbums(allAlbums);
     } catch (error) {
       console.error('Error loading artist:', error);
     } finally {
@@ -137,9 +165,10 @@ export const ArtistDetailScreen: React.FC<ArtistDetailScreenProps> = ({ navigati
   return (
     <View style={[styles.container, { backgroundColor: currentTheme.colors.background }]}>
       <FlatList
+        key={`artist-albums-${numColumns}`}
         data={albums}
         keyExtractor={(item, index) => `${item.id}-${index}`}
-        numColumns={2}
+        numColumns={numColumns}
         contentContainerStyle={styles.listContent}
         columnWrapperStyle={styles.columnWrapper}
         ListHeaderComponent={
@@ -225,8 +254,8 @@ export const ArtistDetailScreen: React.FC<ArtistDetailScreenProps> = ({ navigati
           </View>
         }
         renderItem={({ item }) => (
-          <View style={styles.albumItem}>
-            <AlbumCard album={item} onPress={handleAlbumPress} size={160} />
+          <View style={[styles.albumItem, { width: `${Math.floor(100 / numColumns) - 2}%` }]}>
+            <AlbumCard album={item} onPress={handleAlbumPress} size={cardSize} />
           </View>
         )}
         ListEmptyComponent={
