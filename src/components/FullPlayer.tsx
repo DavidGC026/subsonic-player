@@ -9,6 +9,7 @@ import {
   Animated as RNAnimated,
   Image,
 } from 'react-native';
+import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import DraggableFlatList, {
   ScaleDecorator,
   RenderItemParams,
@@ -35,7 +36,7 @@ const formatTime = (milliseconds: number): string => {
   return `${mins}:${secs.toString().padStart(2, '0')}`;
 };
 
-// ─── Immersive Landscape View ────────────────────────────────────────────────
+// ─── Immersive Fullscreen View ───────────────────────────────────────────────
 
 interface ImmersiveViewProps {
   currentSong: Song;
@@ -44,8 +45,17 @@ interface ImmersiveViewProps {
   onNext: () => void;
   onPrevious: () => void;
   onClose?: () => void;
+  onToggleStar: () => void;
+  onToggleShuffle: () => void;
+  onSetRepeatMode: () => void;
+  shuffleMode: boolean;
+  repeatMode: 'none' | 'all' | 'one';
+  position: number;
+  duration: number;
+  onSeek: (value: number) => void;
   screenWidth: number;
   screenHeight: number;
+  currentTheme: any;
 }
 
 const ImmersiveView: React.FC<ImmersiveViewProps> = ({
@@ -55,51 +65,130 @@ const ImmersiveView: React.FC<ImmersiveViewProps> = ({
   onNext,
   onPrevious,
   onClose,
+  onToggleStar,
+  onToggleShuffle,
+  onSetRepeatMode,
+  shuffleMode,
+  repeatMode,
+  position,
+  duration,
+  onSeek,
   screenWidth,
   screenHeight,
+  currentTheme,
 }) => {
   const [showControls, setShowControls] = useState(false);
   const fadeAnim = useRef(new RNAnimated.Value(0)).current;
+  const heartScaleAnim = useRef(new RNAnimated.Value(0)).current;
+  const heartOpacityAnim = useRef(new RNAnimated.Value(0)).current;
   const hideTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const [isSeeking, setIsSeeking] = useState(false);
+  const [seekPos, setSeekPos] = useState(0);
 
-  const artSize = Math.min(screenWidth, screenHeight) * 0.85;
+  const artSize = Math.min(screenWidth, screenHeight) * 0.55;
   const coverUrl = subsonicApi.getCoverArtUrl(currentSong.coverArt, 1000);
+  const isStarred = !!currentSong.starred;
+  const primaryColor = currentTheme.colors.primary;
+
+  const scheduleHide = useCallback(() => {
+    if (hideTimer.current) clearTimeout(hideTimer.current);
+    hideTimer.current = setTimeout(() => {
+      RNAnimated.timing(fadeAnim, {
+        toValue: 0,
+        duration: 400,
+        useNativeDriver: true,
+      }).start(() => setShowControls(false));
+    }, 4000);
+  }, [fadeAnim]);
 
   const toggleControls = useCallback(() => {
     if (hideTimer.current) clearTimeout(hideTimer.current);
 
     if (showControls) {
-      // Hide
       RNAnimated.timing(fadeAnim, {
         toValue: 0,
         duration: 250,
         useNativeDriver: true,
       }).start(() => setShowControls(false));
     } else {
-      // Show
       setShowControls(true);
       RNAnimated.timing(fadeAnim, {
         toValue: 1,
         duration: 250,
         useNativeDriver: true,
       }).start();
-
-      // Auto-hide after 4 seconds
-      hideTimer.current = setTimeout(() => {
-        RNAnimated.timing(fadeAnim, {
-          toValue: 0,
-          duration: 400,
-          useNativeDriver: true,
-        }).start(() => setShowControls(false));
-      }, 4000);
+      scheduleHide();
     }
-  }, [showControls, fadeAnim]);
+  }, [showControls, fadeAnim, scheduleHide]);
+
+  const handleToggleStar = useCallback(() => {
+    // Giant heart animation
+    heartScaleAnim.setValue(0);
+    heartOpacityAnim.setValue(1);
+    RNAnimated.sequence([
+      RNAnimated.spring(heartScaleAnim, {
+        toValue: 1,
+        friction: 3,
+        tension: 100,
+        useNativeDriver: true,
+      }),
+      RNAnimated.timing(heartOpacityAnim, {
+        toValue: 0,
+        duration: 600,
+        useNativeDriver: true,
+      }),
+    ]).start();
+
+    onToggleStar();
+    // Reset auto-hide timer
+    scheduleHide();
+  }, [onToggleStar, heartScaleAnim, heartOpacityAnim, scheduleHide]);
+
+  const handleSeekStart = useCallback((value: number) => {
+    setIsSeeking(true);
+    setSeekPos(value);
+    if (hideTimer.current) clearTimeout(hideTimer.current);
+  }, []);
+
+  const handleSeekComplete = useCallback((value: number) => {
+    onSeek(value);
+    setIsSeeking(false);
+    scheduleHide();
+  }, [onSeek, scheduleHide]);
+
+  const handleSeekChange = useCallback((value: number) => {
+    setSeekPos(value);
+  }, []);
 
   useEffect(() => {
     return () => {
       if (hideTimer.current) clearTimeout(hideTimer.current);
     };
   }, []);
+
+  const displayPosition = isSeeking ? seekPos : position;
+  const displayDuration = duration || currentSong.duration * 1000;
+
+  // Theme background rendering
+  const renderBackground = () => {
+    if (currentTheme.flags?.animatedBackground) {
+      return <AnimatedBackground {...currentTheme.flags.animatedBackground} />;
+    }
+    if (currentTheme.flags?.useBackgroundImage) {
+      return (
+        <ImageBackground
+          source={require('../../assets/fondo.jpg')}
+          style={StyleSheet.absoluteFill}
+          resizeMode="cover"
+        >
+          <View style={[StyleSheet.absoluteFill, { backgroundColor: 'rgba(0,0,0,0.55)' }]} />
+        </ImageBackground>
+      );
+    }
+    // Default: gradient based on theme background color
+    const bg = currentTheme.colors.background === 'transparent' ? '#121212' : currentTheme.colors.background;
+    return <View style={[StyleSheet.absoluteFill, { backgroundColor: bg }]} />;
+  };
 
   return (
     <TouchableOpacity
@@ -109,48 +198,162 @@ const ImmersiveView: React.FC<ImmersiveViewProps> = ({
     >
       <StatusBar hidden />
 
-      {/* Full-screen cover art */}
-      {coverUrl ? (
-        <Image
-          source={{ uri: coverUrl }}
-          style={[immersiveStyles.coverArt, { width: artSize, height: artSize }]}
-          resizeMode="contain"
-        />
-      ) : (
-        <View style={[immersiveStyles.placeholder, { width: artSize, height: artSize }]}>
-          <Ionicons name="musical-note" size={120} color="#333" />
-        </View>
-      )}
-
-      {/* Song title at bottom */}
-      <View style={immersiveStyles.songInfo}>
-        <Text style={immersiveStyles.songTitle} numberOfLines={1}>{currentSong.title}</Text>
-        <Text style={immersiveStyles.songArtist} numberOfLines={1}>{currentSong.artist}</Text>
+      {/* Theme-aware background */}
+      <View style={StyleSheet.absoluteFill}>
+        {renderBackground()}
       </View>
 
-      {/* Overlay controls (shown on tap) */}
+      {/* Album art */}
+      <View style={immersiveStyles.artWrapper}>
+        {coverUrl ? (
+          <Image
+            source={{ uri: coverUrl }}
+            style={[immersiveStyles.coverArt, { width: artSize, height: artSize }]}
+            resizeMode="cover"
+          />
+        ) : (
+          <View style={[immersiveStyles.placeholder, { width: artSize, height: artSize }]}>
+            <Ionicons name="musical-note" size={100} color="rgba(255,255,255,0.2)" />
+          </View>
+        )}
+      </View>
+
+      {/* Song info (always visible, subtle) */}
+      <View style={immersiveStyles.songInfoMinimal}>
+        <Text style={immersiveStyles.songTitleMinimal} numberOfLines={1}>{currentSong.title}</Text>
+        <Text style={immersiveStyles.songArtistMinimal} numberOfLines={1}>{currentSong.artist}</Text>
+      </View>
+
+      {/* Giant heart animation overlay (appears on star toggle) */}
+      <RNAnimated.View
+        pointerEvents="none"
+        style={[
+          immersiveStyles.giantHeartOverlay,
+          {
+            opacity: heartOpacityAnim,
+            transform: [{ scale: heartScaleAnim }],
+          },
+        ]}
+      >
+        <Ionicons
+          name={isStarred ? 'heart-outline' : 'heart'}
+          size={120}
+          color={primaryColor}
+        />
+      </RNAnimated.View>
+
+      {/* Controls overlay (shown on tap) */}
       {showControls && (
         <RNAnimated.View style={[immersiveStyles.controlsOverlay, { opacity: fadeAnim }]}>
-          {/* Close button */}
-          <TouchableOpacity
-            style={immersiveStyles.closeBtn}
-            onPress={onClose}
-            hitSlop={{ top: 16, bottom: 16, left: 16, right: 16 }}
-          >
-            <Ionicons name="chevron-down" size={32} color="#fff" />
-          </TouchableOpacity>
+          {/* Top bar: close button */}
+          <View style={immersiveStyles.topBar}>
+            <TouchableOpacity
+              style={immersiveStyles.closeBtn}
+              onPress={onClose}
+              hitSlop={{ top: 16, bottom: 16, left: 16, right: 16 }}
+            >
+              <Ionicons name="chevron-down" size={30} color="#fff" />
+            </TouchableOpacity>
+          </View>
 
-          {/* Playback controls */}
-          <View style={immersiveStyles.playbackRow}>
-            <TouchableOpacity onPress={onPrevious} style={immersiveStyles.controlBtn}>
-              <Ionicons name="play-skip-back" size={36} color="#fff" />
+          {/* Center: Giant heart button */}
+          <View style={immersiveStyles.heartSection}>
+            <TouchableOpacity
+              onPress={handleToggleStar}
+              activeOpacity={0.7}
+              style={immersiveStyles.heartButton}
+            >
+              <Ionicons
+                name={isStarred ? 'heart' : 'heart-outline'}
+                size={80}
+                color={isStarred ? primaryColor : 'rgba(255,255,255,0.8)'}
+              />
             </TouchableOpacity>
-            <TouchableOpacity onPress={onTogglePlay} style={immersiveStyles.playBtn}>
-              <Ionicons name={isPlaying ? 'pause' : 'play'} size={48} color="#000" />
-            </TouchableOpacity>
-            <TouchableOpacity onPress={onNext} style={immersiveStyles.controlBtn}>
-              <Ionicons name="play-skip-forward" size={36} color="#fff" />
-            </TouchableOpacity>
+          </View>
+
+          {/* Bottom section: progress + controls */}
+          <View style={immersiveStyles.bottomSection}>
+            {/* Song info */}
+            <View style={immersiveStyles.songInfoOverlay}>
+              <Text style={immersiveStyles.songTitleOverlay} numberOfLines={1}>{currentSong.title}</Text>
+              <Text style={immersiveStyles.songArtistOverlay} numberOfLines={1}>{currentSong.artist} • {currentSong.album}</Text>
+            </View>
+
+            {/* Progress bar */}
+            <View style={immersiveStyles.progressSection}>
+              <CustomSlider
+                style={immersiveStyles.slider}
+                minimumValue={0}
+                maximumValue={displayDuration}
+                value={displayPosition}
+                onSlidingStart={handleSeekStart}
+                onSlidingComplete={handleSeekComplete}
+                onValueChange={handleSeekChange}
+                minimumTrackTintColor={primaryColor}
+                maximumTrackTintColor="rgba(255,255,255,0.25)"
+                thumbTintColor="#fff"
+              />
+              <View style={immersiveStyles.timeRow}>
+                <Text style={immersiveStyles.timeText}>{formatTime(displayPosition)}</Text>
+                <Text style={immersiveStyles.timeText}>{formatTime(displayDuration)}</Text>
+              </View>
+            </View>
+
+            {/* Playback controls */}
+            <View style={immersiveStyles.playbackRow}>
+              <TouchableOpacity
+                onPress={() => { onToggleShuffle(); scheduleHide(); }}
+                style={immersiveStyles.secondaryBtn}
+              >
+                <ThemeIcon
+                  name="shuffle"
+                  size={22}
+                  color={shuffleMode ? primaryColor : 'rgba(255,255,255,0.6)'}
+                />
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                onPress={() => { onPrevious(); scheduleHide(); }}
+                style={immersiveStyles.controlBtn}
+              >
+                <ThemeIcon name="play-skip-back" size={32} color="#fff" />
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                onPress={() => { onTogglePlay(); scheduleHide(); }}
+                style={[immersiveStyles.playBtn, { backgroundColor: primaryColor }]}
+              >
+                <ThemeIcon
+                  name={isPlaying ? 'pause' : 'play'}
+                  size={36}
+                  color="#fff"
+                  style={isPlaying ? {} : { marginLeft: 3 }}
+                />
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                onPress={() => { onNext(); scheduleHide(); }}
+                style={immersiveStyles.controlBtn}
+              >
+                <ThemeIcon name="play-skip-forward" size={32} color="#fff" />
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                onPress={() => { onSetRepeatMode(); scheduleHide(); }}
+                style={immersiveStyles.secondaryBtn}
+              >
+                <ThemeIcon
+                  name="repeat"
+                  size={22}
+                  color={repeatMode !== 'none' ? primaryColor : 'rgba(255,255,255,0.6)'}
+                />
+                {repeatMode === 'one' && (
+                  <View style={[immersiveStyles.repeatBadge, { backgroundColor: primaryColor }]}>
+                    <Text style={immersiveStyles.repeatBadgeText}>1</Text>
+                  </View>
+                )}
+              </TouchableOpacity>
+            </View>
           </View>
         </RNAnimated.View>
       )}
@@ -161,63 +364,141 @@ const ImmersiveView: React.FC<ImmersiveViewProps> = ({
 const immersiveStyles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#000000',
+    backgroundColor: '#000',
     justifyContent: 'center',
     alignItems: 'center',
+  },
+  artWrapper: {
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 12 },
+    shadowOpacity: 0.6,
+    shadowRadius: 24,
+    elevation: 20,
   },
   coverArt: {
-    borderRadius: 4,
+    borderRadius: 16,
   },
   placeholder: {
-    backgroundColor: '#111',
-    borderRadius: 4,
+    backgroundColor: 'rgba(255,255,255,0.05)',
+    borderRadius: 16,
     justifyContent: 'center',
     alignItems: 'center',
   },
-  songInfo: {
+  songInfoMinimal: {
     position: 'absolute',
-    bottom: 24,
+    bottom: 32,
     left: 32,
     right: 32,
     alignItems: 'center',
   },
-  songTitle: {
-    color: 'rgba(255,255,255,0.7)',
+  songTitleMinimal: {
+    color: 'rgba(255,255,255,0.6)',
     fontSize: 14,
     fontWeight: '600',
     marginBottom: 2,
   },
-  songArtist: {
-    color: 'rgba(255,255,255,0.4)',
+  songArtistMinimal: {
+    color: 'rgba(255,255,255,0.35)',
     fontSize: 12,
   },
-  controlsOverlay: {
-    ...StyleSheet.absoluteFillObject,
-    backgroundColor: 'rgba(0,0,0,0.45)',
+  giantHeartOverlay: {
+    position: 'absolute',
     justifyContent: 'center',
     alignItems: 'center',
   },
+  controlsOverlay: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: 'rgba(0,0,0,0.55)',
+    justifyContent: 'space-between',
+  },
+  topBar: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingTop: 16,
+    paddingHorizontal: 16,
+  },
   closeBtn: {
-    position: 'absolute',
-    top: 16,
-    left: 16,
     padding: 8,
+  },
+  heartSection: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  heartButton: {
+    padding: 20,
+  },
+  bottomSection: {
+    paddingHorizontal: 24,
+    paddingBottom: 40,
+  },
+  songInfoOverlay: {
+    alignItems: 'center',
+    marginBottom: 16,
+  },
+  songTitleOverlay: {
+    color: '#fff',
+    fontSize: 18,
+    fontWeight: '700',
+    marginBottom: 4,
+    textAlign: 'center',
+  },
+  songArtistOverlay: {
+    color: 'rgba(255,255,255,0.6)',
+    fontSize: 13,
+    textAlign: 'center',
+  },
+  progressSection: {
+    marginBottom: 12,
+  },
+  slider: {
+    width: '100%',
+    height: 32,
+  },
+  timeRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    paddingHorizontal: 4,
+    marginTop: -4,
+  },
+  timeText: {
+    color: 'rgba(255,255,255,0.5)',
+    fontSize: 11,
   },
   playbackRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 40,
+    justifyContent: 'center',
+    gap: 20,
+  },
+  secondaryBtn: {
+    padding: 10,
   },
   controlBtn: {
-    padding: 12,
+    padding: 10,
   },
   playBtn: {
-    width: 72,
-    height: 72,
-    borderRadius: 36,
-    backgroundColor: '#fff',
+    width: 64,
+    height: 64,
+    borderRadius: 32,
     justifyContent: 'center',
     alignItems: 'center',
+    marginHorizontal: 8,
+  },
+  repeatBadge: {
+    position: 'absolute',
+    bottom: 6,
+    right: 6,
+    borderRadius: 6,
+    width: 12,
+    height: 12,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  repeatBadgeText: {
+    fontSize: 7,
+    fontWeight: 'bold',
+    color: '#fff',
   },
 });
 
@@ -322,6 +603,7 @@ export const FullPlayer: React.FC<FullPlayerProps> = ({ onClose }) => {
   const [isSeeking, setIsSeeking] = useState(false);
   const [seekPosition, setSeekPosition] = useState(0);
   const [showQueue, setShowQueue] = useState(false);
+  const [isImmersive, setIsImmersive] = useState(false);
   const { currentTheme } = useThemeStore();
   const { isTablet, screenWidth } = useIsTablet();
   const { isLandscape, screenWidth: lsWidth, screenHeight: lsHeight } = useLandscape();
@@ -375,8 +657,8 @@ export const FullPlayer: React.FC<FullPlayerProps> = ({ onClose }) => {
     return null;
   }
 
-  // ── Immersive Mode: Landscape on phones ──
-  if (isLandscape && !isTablet) {
+  // ── Immersive Mode: Landscape on phones OR manually triggered ──
+  if ((isLandscape && !isTablet) || isImmersive) {
     return (
       <ImmersiveView
         currentSong={currentSong}
@@ -384,9 +666,24 @@ export const FullPlayer: React.FC<FullPlayerProps> = ({ onClose }) => {
         onTogglePlay={togglePlay}
         onNext={playNext}
         onPrevious={playPrevious}
-        onClose={onClose}
-        screenWidth={lsWidth}
-        screenHeight={lsHeight}
+        onClose={() => {
+          if (isImmersive) {
+            setIsImmersive(false);
+          } else if (onClose) {
+            onClose();
+          }
+        }}
+        onToggleStar={() => usePlayerStore.getState().toggleStar(currentSong.id, 'song', !!currentSong.starred)}
+        onToggleShuffle={toggleShuffle}
+        onSetRepeatMode={() => setRepeatMode(repeatMode === 'none' ? 'all' : repeatMode === 'all' ? 'one' : 'none')}
+        shuffleMode={shuffleMode}
+        repeatMode={repeatMode}
+        position={position}
+        duration={duration || currentSong.duration * 1000}
+        onSeek={seekTo}
+        screenWidth={isImmersive ? screenWidth : lsWidth}
+        screenHeight={isImmersive ? screenWidth * 1.5 : lsHeight}
+        currentTheme={currentTheme}
       />
     );
   }
@@ -395,7 +692,7 @@ export const FullPlayer: React.FC<FullPlayerProps> = ({ onClose }) => {
   const displayDuration = duration || currentSong.duration * 1000;
 
   return (
-    <View style={[styles.container, { backgroundColor: currentTheme.colors.background }]}>
+    <GestureHandlerRootView style={[styles.container, { backgroundColor: currentTheme.colors.background }]}>
       {/* Background */}
       <View style={styles.background}>
         {currentTheme.flags?.animatedBackground ? (
@@ -420,9 +717,14 @@ export const FullPlayer: React.FC<FullPlayerProps> = ({ onClose }) => {
           <Ionicons name="chevron-down" size={32} color={currentTheme.colors.text} />
         </TouchableOpacity>
         <Text style={[styles.headerTitle, { color: currentTheme.colors.text }]}>{showQueue ? 'COLA' : 'REPRODUCIENDO'}</Text>
-        <TouchableOpacity style={styles.moreButton} onPress={() => setShowQueue(!showQueue)}>
-          <Ionicons name={showQueue ? "close" : "list"} size={26} color={currentTheme.colors.text} />
-        </TouchableOpacity>
+        <View style={styles.headerActions}>
+          <TouchableOpacity style={styles.moreButton} onPress={() => setIsImmersive(true)}>
+            <Ionicons name="expand" size={22} color={currentTheme.colors.text} />
+          </TouchableOpacity>
+          <TouchableOpacity style={styles.moreButton} onPress={() => setShowQueue(!showQueue)}>
+            <Ionicons name={showQueue ? "close" : "list"} size={26} color={currentTheme.colors.text} />
+          </TouchableOpacity>
+        </View>
       </View>
 
       {showQueue ? (
@@ -552,7 +854,7 @@ export const FullPlayer: React.FC<FullPlayerProps> = ({ onClose }) => {
           </View>
         </>
       )}
-    </View>
+    </GestureHandlerRootView>
   );
 };
 
@@ -584,6 +886,11 @@ const styles = StyleSheet.create({
   },
   moreButton: {
     padding: 8,
+  },
+  headerActions: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
   },
   artContainer: {
     alignItems: 'center',
