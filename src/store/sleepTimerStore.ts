@@ -1,6 +1,8 @@
 import { create } from 'zustand';
-import { AppState, type NativeEventSubscription } from 'react-native';
+import { AppState, NativeModules, type NativeEventSubscription } from 'react-native';
 import TrackPlayer from 'react-native-track-player';
+
+const { SleepTimerModule } = NativeModules;
 
 interface SleepTimerStore {
     /** Remaining time in seconds, 0 = timer not active */
@@ -43,6 +45,24 @@ function clearAppStateListener(): void {
     }
 }
 
+/** Cancel the native AlarmManager alarm (safe to call even if none is set). */
+function cancelNativeAlarm(): void {
+    SleepTimerModule?.cancelAlarm()
+        .catch((e: any) => console.warn('[SleepTimer] cancelAlarm error:', e));
+}
+
+/**
+ * Schedule (or reschedule) the native AlarmManager exact alarm.
+ * When it fires, SleepTimerAlarmReceiver sends a MEDIA_PAUSE key event
+ * through the Android media framework, which pauses TrackPlayer
+ * even if the JS thread is fully suspended.
+ */
+function scheduleNativeAlarm(expiresAtMs: number): void {
+    SleepTimerModule?.scheduleAlarm(expiresAtMs)
+        .then(() => console.log('[SleepTimer] Native alarm scheduled'))
+        .catch((e: any) => console.warn('[SleepTimer] scheduleAlarm error:', e));
+}
+
 /**
  * Core expiry logic – shared by the UI interval tick AND the background
  * progress listener in PlaybackService.
@@ -60,6 +80,8 @@ function handleExpiry(): boolean {
     if (now >= expiresAt) {
         if (finishCurrentSong) {
             // Enter "waiting for current song to end" mode
+            // Cancel the native alarm – we'll handle it via track change
+            cancelNativeAlarm();
             useSleepTimerStore.setState({
                 remainingSeconds: 0,
                 waitingForSongEnd: true,
@@ -72,6 +94,7 @@ function handleExpiry(): boolean {
             TrackPlayer.pause().catch(console.error);
             clearUiInterval();
             clearAppStateListener();
+            cancelNativeAlarm();
             useSleepTimerStore.setState({
                 remainingSeconds: 0,
                 isActive: false,
@@ -136,6 +159,7 @@ export const useSleepTimerStore = create<SleepTimerStore>((set, get) => ({
 
     startTimer: (minutes: number) => {
         clearUiInterval();
+        cancelNativeAlarm();
 
         const totalSeconds = minutes * 60;
         const expiresAt = Date.now() + totalSeconds * 1000;
@@ -147,7 +171,17 @@ export const useSleepTimerStore = create<SleepTimerStore>((set, get) => ({
             expiresAt,
         });
 
-        // Start foreground UI countdown
+        // ── Primary mechanism: native AlarmManager exact alarm ──
+        // Zero battery cost while waiting. OS fires it at kernel level.
+        // Only schedule if "finish current song" is OFF – when ON, we need
+        // the JS side to intercept the track change, so we rely on the
+        // secondary mechanisms below.
+        if (!get().finishCurrentSong) {
+            scheduleNativeAlarm(expiresAt);
+        }
+
+        // ── Secondary mechanisms (belt & suspenders) ──
+        // Foreground UI countdown
         startUiInterval();
         // Listen for app returning to foreground
         setupAppStateListener();
@@ -160,6 +194,7 @@ export const useSleepTimerStore = create<SleepTimerStore>((set, get) => ({
     cancelTimer: () => {
         clearUiInterval();
         clearAppStateListener();
+        cancelNativeAlarm();
         set({
             remainingSeconds: 0,
             isActive: false,
@@ -170,7 +205,23 @@ export const useSleepTimerStore = create<SleepTimerStore>((set, get) => ({
     },
 
     toggleFinishCurrentSong: () => {
-        set((state) => ({ finishCurrentSong: !state.finishCurrentSong }));
+        set((state) => {
+            const newValue = !state.finishCurrentSong;
+
+            // If there's an active timer, update the native alarm accordingly
+            if (state.isActive && state.expiresAt !== null && !state.waitingForSongEnd) {
+                if (newValue) {
+                    // "Finish current song" turned ON → cancel native alarm
+                    // (we'll handle it via track change in JS)
+                    cancelNativeAlarm();
+                } else {
+                    // "Finish current song" turned OFF → schedule native alarm
+                    scheduleNativeAlarm(state.expiresAt);
+                }
+            }
+
+            return { finishCurrentSong: newValue };
+        });
     },
 }));
 
@@ -187,6 +238,7 @@ export function handleSleepTimerTrackChange(): void {
         TrackPlayer.pause().catch(console.error);
         clearUiInterval();
         clearAppStateListener();
+        cancelNativeAlarm();
         useSleepTimerStore.setState({
             remainingSeconds: 0,
             isActive: false,
@@ -199,9 +251,8 @@ export function handleSleepTimerTrackChange(): void {
 
 /**
  * Called from PlaybackService on every progress update (~1 s).
- * Because the PlaybackService runs as an Android Foreground Service,
- * this fires even when the React Native JS bridge is in the background,
- * guaranteeing the timer will trigger.
+ * Acts as a fallback in case the native alarm didn't fire
+ * (e.g. the "finish current song" flow that needs JS).
  */
 export function checkSleepTimerExpiry(): void {
     handleExpiry();

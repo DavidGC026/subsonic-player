@@ -11,6 +11,7 @@ export { PlaylistSelectModal } from './PlaylistSelectModal';
 export { PlaylistAddSongsModal } from './PlaylistAddSongsModal';
 export { PlaylistEditModal } from './PlaylistEditModal';
 export * from './ThemeIcon';
+export * from './AlarmModal';
 export { AnimatedBackground } from './AnimatedBackground';
 export { SleepTimerModal } from './SleepTimerModal';
 export { VinylDisc } from './VinylDisc';

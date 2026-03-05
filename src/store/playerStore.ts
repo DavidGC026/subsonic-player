@@ -117,6 +117,12 @@ export const usePlayerStore = create<PlayerStore>((set, get) => ({
     isTrackPlayerReady: false,
 
     initTrackPlayer: async () => {
+        const { isTrackPlayerReady } = get();
+        if (isTrackPlayerReady) {
+            console.log('[TrackPlayer] Already initialized, skipping setup.');
+            return;
+        }
+
         try {
             await TrackPlayer.setupPlayer({
                 autoHandleInterruptions: true,

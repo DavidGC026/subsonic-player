@@ -9,6 +9,8 @@
   <uses-permission android:name="android.permission.VIBRATE"/>
   <uses-permission android:name="android.permission.WAKE_LOCK"/>
   <uses-permission android:name="android.permission.WRITE_EXTERNAL_STORAGE"/>
+  <uses-permission android:name="android.permission.SCHEDULE_EXACT_ALARM"/>
+  <uses-permission android:name="android.permission.USE_EXACT_ALARM"/>
   <queries>
     <intent>
       <action android:name="android.intent.action.VIEW"/>
@@ -32,5 +34,11 @@
         <data android:scheme="exp+subsonic-player"/>
       </intent-filter>
     </activity>
+    <receiver
+        android:name=".sleeptimer.SleepTimerAlarmReceiver"
+        android:exported="false" />
+    <receiver
+        android:name=".alarm.AlarmReceiver"
+        android:exported="false" />
   </application>
 </manifest>

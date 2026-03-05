@@ -226,6 +226,19 @@ class SubsonicAPI {
     };
   }
 
+  // Get single song details
+  async getSong(songId: string): Promise<Song | null> {
+    try {
+      const response = await this.request<{ song: Song }>('getSong', {
+        id: songId,
+      });
+      return response.song || null;
+    } catch (e) {
+      console.error('Error fetching song:', e);
+      return null;
+    }
+  }
+
   // Get directory contents
   async getDirectory(directoryId: string): Promise<Directory> {
     const response = await this.request<{ directory: Directory }>('getMusicDirectory', {

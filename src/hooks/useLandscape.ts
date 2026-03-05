@@ -14,7 +14,7 @@ export const useLandscape = () => {
             setDimensions(window);
         });
         return () => subscription?.remove();
-    }, []); q
+    }, []);
 
     const isLandscape = dimensions.width > dimensions.height;
 

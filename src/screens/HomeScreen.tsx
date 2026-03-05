@@ -1,4 +1,4 @@
-import React, { useEffect, useCallback } from 'react';
+import React, { useEffect, useCallback, useState } from 'react';
 import {
   View,
   Text,
@@ -14,7 +14,7 @@ import {
 import { useIsTablet } from '../hooks/useIsTablet';
 import { Ionicons } from '@expo/vector-icons';
 import { usePlayerStore, useLibraryStore, useConfigStore, useThemeStore } from '../store';
-import { AlbumCard, ArtistCard } from '../components';
+import { AlbumCard, ArtistCard, AlarmModal } from '../components';
 import type { Album, Artist, Playlist } from '../types';
 import { subsonicApi } from '../api/subsonic';
 
@@ -38,9 +38,11 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
 
   const { isConfigured } = useConfigStore();
   const [refreshing, setRefreshing] = React.useState(false);
-  const [frequentAlbums, setFrequentAlbums] = React.useState<Album[]>([]);
+  const [frequentAlbums, setFrequentAlbums] = useState<Album[]>([]);
   const { currentTheme } = useThemeStore();
   const { isTablet, screenWidth, getSize, getColumns } = useIsTablet();
+
+  const [showAlarm, setShowAlarm] = useState(false);
 
   const gridCols = getColumns(3, 5);
   const gridItemWidth = (screenWidth - 32 - (12 * gridCols)) / gridCols;
@@ -127,6 +129,12 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
       <View style={styles.header}>
         <Text style={[styles.greeting, { color: currentTheme.colors.text }]}>Buenos días</Text>
         <View style={styles.headerButtons}>
+          <TouchableOpacity
+            style={styles.headerButton}
+            onPress={() => setShowAlarm(true)}
+          >
+            <Ionicons name="alarm-outline" size={24} color={currentTheme.colors.text} />
+          </TouchableOpacity>
           <TouchableOpacity
             style={styles.headerButton}
             onPress={() => navigation?.navigate('Themes')}
@@ -245,72 +253,76 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
       </View>
 
       {/* Most Played Albums */}
-      {frequentAlbums.length > 0 && (
-        <View style={styles.section}>
-          <View style={styles.sectionHeader}>
-            <Text style={[styles.sectionTitle, { color: currentTheme.colors.text }]}>Más Reproducidos</Text>
-          </View>
+      {
+        frequentAlbums.length > 0 && (
+          <View style={styles.section}>
+            <View style={styles.sectionHeader}>
+              <Text style={[styles.sectionTitle, { color: currentTheme.colors.text }]}>Más Reproducidos</Text>
+            </View>
 
-          <ScrollView
-            horizontal
-            showsHorizontalScrollIndicator={false}
-            contentContainerStyle={styles.horizontalList}
-          >
-            {frequentAlbums.map((album, index) => (
-              <AlbumCard
-                key={`freq-${album.id}-${index}`}
-                album={album}
-                onPress={handleAlbumPress}
-                size={albumCardSize}
-              />
-            ))}
-          </ScrollView>
-        </View>
-      )}
+            <ScrollView
+              horizontal
+              showsHorizontalScrollIndicator={false}
+              contentContainerStyle={styles.horizontalList}
+            >
+              {frequentAlbums.map((album, index) => (
+                <AlbumCard
+                  key={`freq-${album.id}-${index}`}
+                  album={album}
+                  onPress={handleAlbumPress}
+                  size={albumCardSize}
+                />
+              ))}
+            </ScrollView>
+          </View>
+        )
+      }
 
       {/* Playlists */}
-      {playlists.length > 0 && (
-        <View style={styles.section}>
-          <View style={styles.sectionHeader}>
-            <Text style={[styles.sectionTitle, { color: currentTheme.colors.text }]}>Tus Playlists</Text>
-            <TouchableOpacity onPress={() => navigation?.navigate('Library', { tab: 'playlists' })}>
-              <Text style={[styles.seeAll, { color: currentTheme.colors.textSecondary }]}>Ver todo</Text>
-            </TouchableOpacity>
-          </View>
-
-          <ScrollView
-            horizontal
-            showsHorizontalScrollIndicator={false}
-            contentContainerStyle={styles.horizontalList}
-          >
-            {playlists.slice(0, 8).map((playlist, index) => (
-              <TouchableOpacity
-                key={`pl-${playlist.id}-${index}`}
-                style={[styles.playlistCard, { backgroundColor: currentTheme.colors.surface }]}
-                onPress={() => handlePlaylistPress(playlist)}
-                activeOpacity={0.7}
-              >
-                {customPlaylistImages[playlist.id] ? (
-                  <Image
-                    source={{ uri: customPlaylistImages[playlist.id] }}
-                    style={styles.playlistCardImage}
-                  />
-                ) : (
-                  <View style={[styles.playlistCardIcon, { backgroundColor: currentTheme.colors.background }]}>
-                    <Ionicons name="musical-notes" size={28} color={currentTheme.colors.textSecondary} />
-                  </View>
-                )}
-                <Text style={[styles.playlistCardName, { color: currentTheme.colors.text }]} numberOfLines={1}>
-                  {playlist.name}
-                </Text>
-                <Text style={[styles.playlistCardMeta, { color: currentTheme.colors.textSecondary }]}>
-                  {playlist.songCount} canciones
-                </Text>
+      {
+        playlists.length > 0 && (
+          <View style={styles.section}>
+            <View style={styles.sectionHeader}>
+              <Text style={[styles.sectionTitle, { color: currentTheme.colors.text }]}>Tus Playlists</Text>
+              <TouchableOpacity onPress={() => navigation?.navigate('Library', { tab: 'playlists' })}>
+                <Text style={[styles.seeAll, { color: currentTheme.colors.textSecondary }]}>Ver todo</Text>
               </TouchableOpacity>
-            ))}
-          </ScrollView>
-        </View>
-      )}
+            </View>
+
+            <ScrollView
+              horizontal
+              showsHorizontalScrollIndicator={false}
+              contentContainerStyle={styles.horizontalList}
+            >
+              {playlists.slice(0, 8).map((playlist, index) => (
+                <TouchableOpacity
+                  key={`pl-${playlist.id}-${index}`}
+                  style={[styles.playlistCard, { backgroundColor: currentTheme.colors.surface }]}
+                  onPress={() => handlePlaylistPress(playlist)}
+                  activeOpacity={0.7}
+                >
+                  {customPlaylistImages[playlist.id] ? (
+                    <Image
+                      source={{ uri: customPlaylistImages[playlist.id] }}
+                      style={styles.playlistCardImage}
+                    />
+                  ) : (
+                    <View style={[styles.playlistCardIcon, { backgroundColor: currentTheme.colors.background }]}>
+                      <Ionicons name="musical-notes" size={28} color={currentTheme.colors.textSecondary} />
+                    </View>
+                  )}
+                  <Text style={[styles.playlistCardName, { color: currentTheme.colors.text }]} numberOfLines={1}>
+                    {playlist.name}
+                  </Text>
+                  <Text style={[styles.playlistCardMeta, { color: currentTheme.colors.textSecondary }]}>
+                    {playlist.songCount} canciones
+                  </Text>
+                </TouchableOpacity>
+              ))}
+            </ScrollView>
+          </View>
+        )
+      }
 
       {/* More Albums Grid */}
       <View style={styles.section}>
@@ -329,7 +341,9 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
       </View>
 
       <View style={styles.bottomPadding} />
-    </ScrollView>
+
+      {isConfigured && <AlarmModal visible={showAlarm} onClose={() => setShowAlarm(false)} />}
+    </ScrollView >
   );
 };
 
