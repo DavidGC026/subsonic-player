@@ -2,6 +2,7 @@ import React from 'react';
 import { View, Image, StyleSheet } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { subsonicApi } from '../api/subsonic';
+import { CacheManager } from '../services/CacheManager';
 
 interface AlbumArtProps {
   coverArtId?: string;
@@ -16,7 +17,9 @@ export const AlbumArt: React.FC<AlbumArtProps> = ({
   borderRadius = 8,
   iconSize = 50,
 }) => {
-  const imageUrl = subsonicApi.getCoverArtUrl(coverArtId, size * 2);
+  const remoteUrl = subsonicApi.getCoverArtUrl(coverArtId, size * 2);
+  // Use cached cover art if available (offline support), fall back to remote
+  const imageUrl = CacheManager.getCoverArtUri(coverArtId, remoteUrl);
 
   if (!imageUrl) {
     return (

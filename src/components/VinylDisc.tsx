@@ -2,6 +2,7 @@ import React, { useEffect, useRef } from 'react';
 import { View, Image, StyleSheet, Animated, Easing } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { subsonicApi } from '../api/subsonic';
+import { CacheManager } from '../services/CacheManager';
 
 interface VinylDiscProps {
     coverArtId?: string;
@@ -31,7 +32,9 @@ export const VinylDisc: React.FC<VinylDiscProps> = ({
     const grooveRingOuter = size * 0.92;
     const grooveRingInner = size * 0.72;
 
-    const imageUrl = subsonicApi.getCoverArtUrl(coverArtId, Math.round(coverSize * 2));
+    const remoteUrl = subsonicApi.getCoverArtUrl(coverArtId, Math.round(coverSize * 2));
+    // Use cached cover art if available (offline support), fall back to remote
+    const imageUrl = CacheManager.getCoverArtUri(coverArtId, remoteUrl);
 
     useEffect(() => {
         if (isPlaying) {

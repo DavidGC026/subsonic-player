@@ -63,7 +63,9 @@ interface PlayerStore {
  * Build a Track object for react-native-track-player from a Song and its resolved URI.
  */
 function buildTrack(song: Song, uri: string) {
-    const artworkUrl = subsonicApi.getCoverArtUrl(song.coverArt, 600);
+    const remoteArtworkUrl = subsonicApi.getCoverArtUrl(song.coverArt, 600);
+    // Use cached cover art for offline support (lock screen, notifications)
+    const artworkUrl = CacheManager.getCoverArtUri(song.coverArt, remoteArtworkUrl);
     return {
         id: song.id,
         url: uri,
@@ -73,6 +75,25 @@ function buildTrack(song: Song, uri: string) {
         duration: song.duration,
         artwork: artworkUrl || undefined,
     };
+}
+
+/**
+ * Resolve the playback URI for a song.
+ * ALWAYS prioritises the local cached/downloaded file. Only falls back
+ * to remote streaming when there is no valid local file.
+ */
+async function getResolvedUri(song: Song, startDownload: boolean = true): Promise<string> {
+    // 1. Check for a valid local file first — zero network cost
+    const localUri = CacheManager.getLocalUri(song.id, song.suffix);
+    if (localUri) {
+        console.log(`[Resolve] Using local file: ${song.title}`);
+        CacheManager._touchEntry(song.id).catch(() => { });
+        return localUri;
+    }
+
+    // 2. Not cached locally — fall back to remote streaming (+ optional background download)
+    const remoteUrl = subsonicApi.getStreamUrl(song.id);
+    return CacheManager.getPlaybackUri(song, remoteUrl, startDownload);
 }
 
 // Track the last song that started downloading to prevent race conditions
@@ -160,24 +181,28 @@ export const usePlayerStore = create<PlayerStore>((set, get) => ({
                             },
                         }));
 
-                        // Auto-advanced to a new track, so let's cache it and scrobble it
-                        const remoteUrl = subsonicApi.getStreamUrl(newSong.id);
-                        await CacheManager.getPlaybackUri(newSong, remoteUrl, true);
+                        // Auto-advanced to a new track — ensure it's cached (prioritises local)
+                        await getResolvedUri(newSong, true);
 
                         // ── Pre-fetch n+1: silently cache the NEXT song in queue ──
                         const nextIndex = songIndex + 1;
                         if (nextIndex < player.queue.length) {
                             const nextSong = player.queue[nextIndex];
-                            CacheManager.isCached(nextSong.id).then((alreadyCached) => {
-                                if (!alreadyCached) {
-                                    const nextRemoteUrl = subsonicApi.getStreamUrl(nextSong.id);
-                                    console.log(`[Pre-fetch] Descargando en background: ${nextSong.title}`);
-                                    CacheManager.getPlaybackUri(nextSong, nextRemoteUrl, true)
-                                        .catch((err) => console.warn('[Pre-fetch] Error:', err));
-                                } else {
-                                    console.log(`[Pre-fetch] Ya en caché: ${nextSong.title}`);
-                                }
-                            }).catch((err) => console.warn('[Pre-fetch] Check error:', err));
+                            // Check local file directly first — avoids async index lookup
+                            const nextLocal = CacheManager.getLocalUri(nextSong.id, nextSong.suffix);
+                            if (!nextLocal) {
+                                CacheManager.isCached(nextSong.id).then((alreadyCached) => {
+                                    if (!alreadyCached) {
+                                        console.log(`[Pre-fetch] Descargando en background: ${nextSong.title}`);
+                                        getResolvedUri(nextSong, true)
+                                            .catch((err) => console.warn('[Pre-fetch] Error:', err));
+                                    } else {
+                                        console.log(`[Pre-fetch] Ya en caché: ${nextSong.title}`);
+                                    }
+                                }).catch((err) => console.warn('[Pre-fetch] Check error:', err));
+                            } else {
+                                console.log(`[Pre-fetch] Ya en local: ${nextSong.title}`);
+                            }
                         }
 
                         setTimeout(() => {
@@ -246,8 +271,7 @@ export const usePlayerStore = create<PlayerStore>((set, get) => ({
 
     addToQueue: (song: Song) => {
         const addTrackToQueue = async () => {
-            const remoteUrl = subsonicApi.getStreamUrl(song.id);
-            const finalUri = await CacheManager.getPlaybackUri(song, remoteUrl);
+            const finalUri = await getResolvedUri(song);
             const track = buildTrack(song, finalUri);
             await TrackPlayer.add(track);
         };
@@ -267,8 +291,7 @@ export const usePlayerStore = create<PlayerStore>((set, get) => ({
         const insertIndex = player.currentIndex >= 0 ? player.currentIndex + 1 : 0;
 
         const addTrackToQueue = async () => {
-            const remoteUrl = subsonicApi.getStreamUrl(song.id);
-            const finalUri = await CacheManager.getPlaybackUri(song, remoteUrl);
+            const finalUri = await getResolvedUri(song);
             const track = buildTrack(song, finalUri);
             await TrackPlayer.add(track, insertIndex);
         };
@@ -482,9 +505,8 @@ export const usePlayerStore = create<PlayerStore>((set, get) => ({
             await TrackPlayer.reset();
 
             const tracks = await Promise.all(newQueue.map(async (s) => {
-                const remoteUrl = subsonicApi.getStreamUrl(s.id);
                 const isCurrentlyPlaying = s.id === currentSong.id;
-                const finalUri = await CacheManager.getPlaybackUri(s, remoteUrl, isCurrentlyPlaying);
+                const finalUri = await getResolvedUri(s, isCurrentlyPlaying);
                 return buildTrack(s, finalUri);
             }));
 
@@ -560,16 +582,15 @@ export const usePlayerStore = create<PlayerStore>((set, get) => ({
 
             if (!isQueueLoaded) {
                 await TrackPlayer.reset();
-                const remoteUrl = subsonicApi.getStreamUrl(song.id);
-                const finalUri = await CacheManager.getPlaybackUri(song, remoteUrl, true);
+                const finalUri = await getResolvedUri(song, true);
                 const track = buildTrack(song, finalUri);
                 await TrackPlayer.add(track);
             } else {
                 const trackIndex = player.queue.findIndex(s => s.id === song.id);
                 if (trackIndex >= 0) {
                     await TrackPlayer.skip(trackIndex);
-                    const remoteUrl = subsonicApi.getStreamUrl(song.id);
-                    await CacheManager.getPlaybackUri(song, remoteUrl, true);
+                    // Ensure the song is cached for future plays
+                    await getResolvedUri(song, true);
                 }
             }
 
@@ -589,9 +610,8 @@ export const usePlayerStore = create<PlayerStore>((set, get) => ({
             await TrackPlayer.reset();
 
             const tracks = await Promise.all(queue.map(async (s) => {
-                const remoteUrl = subsonicApi.getStreamUrl(s.id);
                 const isCurrentlyPlaying = s.id === song.id;
-                const finalUri = await CacheManager.getPlaybackUri(s, remoteUrl, isCurrentlyPlaying);
+                const finalUri = await getResolvedUri(s, isCurrentlyPlaying);
                 return buildTrack(s, finalUri);
             }));
 
@@ -626,16 +646,21 @@ export const usePlayerStore = create<PlayerStore>((set, get) => ({
         const nextIdx = idx + 1;
         if (nextIdx < currentQueue.length) {
             const nextSong = currentQueue[nextIdx];
-            CacheManager.isCached(nextSong.id).then((alreadyCached) => {
-                if (!alreadyCached) {
-                    const nextRemoteUrl = subsonicApi.getStreamUrl(nextSong.id);
-                    console.log(`[Pre-fetch] Descargando en background: ${nextSong.title}`);
-                    CacheManager.getPlaybackUri(nextSong, nextRemoteUrl, true)
-                        .catch((err) => console.warn('[Pre-fetch] Error:', err));
-                } else {
-                    console.log(`[Pre-fetch] Ya en caché: ${nextSong.title}`);
-                }
-            }).catch((err) => console.warn('[Pre-fetch] Check error:', err));
+            // Check local file directly first — avoids async index lookup
+            const nextLocal = CacheManager.getLocalUri(nextSong.id, nextSong.suffix);
+            if (!nextLocal) {
+                CacheManager.isCached(nextSong.id).then((alreadyCached) => {
+                    if (!alreadyCached) {
+                        console.log(`[Pre-fetch] Descargando en background: ${nextSong.title}`);
+                        getResolvedUri(nextSong, true)
+                            .catch((err) => console.warn('[Pre-fetch] Error:', err));
+                    } else {
+                        console.log(`[Pre-fetch] Ya en caché: ${nextSong.title}`);
+                    }
+                }).catch((err) => console.warn('[Pre-fetch] Check error:', err));
+            } else {
+                console.log(`[Pre-fetch] Ya en local: ${nextSong.title}`);
+            }
         }
     },
 
