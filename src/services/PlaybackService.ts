@@ -1,4 +1,5 @@
 import TrackPlayer, { Event } from 'react-native-track-player';
+import { checkSleepTimerExpiry } from '../store/sleepTimerStore';
 
 /**
  * Playback service registered with TrackPlayer.
@@ -31,5 +32,12 @@ export async function PlaybackService() {
 
     TrackPlayer.addEventListener(Event.RemoteSeek, (event) => {
         TrackPlayer.seekTo(event.position);
+    });
+
+    // ── Sleep timer: check expiry on every progress tick (~1 s) ──
+    // This fires even in background because PlaybackService runs as a
+    // Foreground Service, guaranteeing the sleep timer will trigger.
+    TrackPlayer.addEventListener(Event.PlaybackProgressUpdated, () => {
+        checkSleepTimerExpiry();
     });
 }
