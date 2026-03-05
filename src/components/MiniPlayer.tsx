@@ -1,8 +1,10 @@
 import React from 'react';
 import { View, Text, TouchableOpacity, StyleSheet, Dimensions } from 'react-native';
 import { usePlayerStore, useThemeStore } from '../store';
+import { useSleepTimerStore } from '../store/sleepTimerStore';
 import { AlbumArt } from './AlbumArt';
 import { ThemeIcon } from './ThemeIcon';
+import { Ionicons } from '@expo/vector-icons';
 
 const { width: screenWidth } = Dimensions.get('window');
 
@@ -13,6 +15,7 @@ interface MiniPlayerProps {
 export const MiniPlayer: React.FC<MiniPlayerProps> = ({ onPress }) => {
   const { player, togglePlay, playNext } = usePlayerStore();
   const { currentTheme } = useThemeStore();
+  const sleepTimerActive = useSleepTimerStore((s) => s.isActive);
   const { currentSong, isPlaying } = player;
 
   if (!currentSong) {
@@ -34,9 +37,14 @@ export const MiniPlayer: React.FC<MiniPlayerProps> = ({ onPress }) => {
         />
 
         <View style={styles.info}>
-          <Text style={[styles.title, { color: currentTheme.colors.text }]} numberOfLines={1} ellipsizeMode="tail">
-            {currentSong.title}
-          </Text>
+          <View style={styles.titleRow}>
+            <Text style={[styles.title, { color: currentTheme.colors.text, flex: 1 }]} numberOfLines={1} ellipsizeMode="tail">
+              {currentSong.title}
+            </Text>
+            {sleepTimerActive && (
+              <Ionicons name="moon" size={14} color={currentTheme.colors.primary} style={{ marginLeft: 6 }} />
+            )}
+          </View>
           <Text style={[styles.artist, { color: currentTheme.colors.textSecondary }]} numberOfLines={1} ellipsizeMode="tail">
             {currentSong.artist}
           </Text>
@@ -110,6 +118,10 @@ const styles = StyleSheet.create({
   artist: {
     fontSize: 12,
     marginTop: 2,
+  },
+  titleRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
   },
   controls: {
     flexDirection: 'row',

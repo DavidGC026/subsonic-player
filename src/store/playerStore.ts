@@ -9,6 +9,7 @@ import TrackPlayer, {
 import type { Song } from '../types';
 import { subsonicApi } from '../api/subsonic';
 import { CacheManager } from '../services/CacheManager';
+import { handleSleepTimerTrackChange } from './sleepTimerStore';
 
 // ---- Types ----
 
@@ -182,6 +183,9 @@ export const usePlayerStore = create<PlayerStore>((set, get) => ({
                         setTimeout(() => {
                             subsonicApi.scrobble(newSong.id);
                         }, Math.min(30000, (newSong.duration * 1000) / 2));
+
+                        // Notify sleep timer about the track change
+                        handleSleepTimerTrackChange();
                     }
                 }
             });

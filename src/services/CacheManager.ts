@@ -16,6 +16,8 @@ interface CacheEntry {
 
 // --- Active downloads tracking for race-condition prevention ---
 const activeDownloads = new Map<string, AbortController>();
+// Track download promises so concurrent callers can await the same download
+const activeDownloadPromises = new Map<string, Promise<void>>();
 
 // Lazily resolved cache directory
 let cacheDir: Directory | null = null;
@@ -77,8 +79,13 @@ export const CacheManager = {
 
         // File not cached — stream remotely
         if (startDownload) {
-            console.log(`[Cache] Streaming remote and caching: ${song.title}`);
-            CacheManager.downloadSong(song, remoteUrl);
+            // If a download is already in progress for this song, don't start another
+            if (activeDownloadPromises.has(song.id)) {
+                console.log(`[Cache] Download already in progress, streaming remote: ${song.title}`);
+            } else {
+                console.log(`[Cache] Streaming remote and caching: ${song.title}`);
+                CacheManager.downloadSong(song, remoteUrl);
+            }
         } else {
             console.log(`[Cache] Streaming remote without caching: ${song.title}`);
         }
@@ -89,15 +96,16 @@ export const CacheManager = {
      * Download a song to the local cache folder using expo-file-system's
      * native download mechanism. Runs silently in the background.
      *
-     * Includes race-condition prevention: if a download for the same song
-     * is already in progress, the previous one is cancelled.
+     * Race-condition safe: if a download for the same song is already in
+     * progress, the existing promise is returned instead of starting a
+     * duplicate download.
      */
     downloadSong: async (song: Song, remoteUrl: string) => {
-        // Cancel any in-flight download for this song
-        const existing = activeDownloads.get(song.id);
-        if (existing) {
-            existing.abort();
-            activeDownloads.delete(song.id);
+        // If a download for this song is already in progress, reuse it
+        const existingPromise = activeDownloadPromises.get(song.id);
+        if (existingPromise) {
+            console.log(`[Cache] Reusing existing download for: ${song.title}`);
+            return existingPromise;
         }
 
         const controller = new AbortController();
@@ -107,35 +115,49 @@ export const CacheManager = {
         const fileName = getFileName(song.id, ext);
         const destination = new File(getCacheDir(), fileName);
 
-        try {
-            // Check if aborted before starting
-            if (controller.signal.aborted) return;
+        const downloadPromise = (async () => {
+            try {
+                // Check if aborted before starting
+                if (controller.signal.aborted) return;
 
-            await File.downloadFileAsync(remoteUrl, destination, { idempotent: true });
+                // Double-check: file might have been cached between the caller's
+                // check and the actual start of this download
+                if (destination.exists) {
+                    console.log(`[Cache] File already exists, skipping download: ${song.title}`);
+                    CacheManager._touchEntry(song.id).catch(() => { });
+                    return;
+                }
 
-            // Check if aborted during download
-            if (controller.signal.aborted) {
-                // Clean up partially downloaded file
-                if (destination.exists) destination.delete();
-                return;
+                await File.downloadFileAsync(remoteUrl, destination, { idempotent: true });
+
+                // Check if aborted during download
+                if (controller.signal.aborted) {
+                    // Clean up partially downloaded file
+                    if (destination.exists) destination.delete();
+                    return;
+                }
+
+                const fileSize = destination.exists ? destination.size : 0;
+                await CacheManager._addToIndex(song.id, ext, fileSize);
+                console.log(`[Cache] Downloaded: ${song.title} (${(fileSize / 1024 / 1024).toFixed(1)} MB)`);
+
+                // Enforce cache size limit after each download
+                await CacheManager._enforceLimit();
+            } catch (error: any) {
+                if (error?.name === 'AbortError' || controller.signal.aborted) {
+                    console.log(`[Cache] Download cancelled: ${song.title}`);
+                    if (destination.exists) destination.delete();
+                } else {
+                    console.error('[Cache Error] Download failed:', error);
+                }
+            } finally {
+                activeDownloads.delete(song.id);
+                activeDownloadPromises.delete(song.id);
             }
+        })();
 
-            const fileSize = destination.exists ? destination.size : 0;
-            await CacheManager._addToIndex(song.id, ext, fileSize);
-            console.log(`[Cache] Downloaded: ${song.title} (${(fileSize / 1024 / 1024).toFixed(1)} MB)`);
-
-            // Enforce cache size limit after each download
-            await CacheManager._enforceLimit();
-        } catch (error: any) {
-            if (error?.name === 'AbortError' || controller.signal.aborted) {
-                console.log(`[Cache] Download cancelled: ${song.title}`);
-                if (destination.exists) destination.delete();
-            } else {
-                console.error('[Cache Error] Download failed:', error);
-            }
-        } finally {
-            activeDownloads.delete(song.id);
-        }
+        activeDownloadPromises.set(song.id, downloadPromise);
+        return downloadPromise;
     },
 
     /**
@@ -147,6 +169,7 @@ export const CacheManager = {
         if (controller) {
             controller.abort();
             activeDownloads.delete(songId);
+            activeDownloadPromises.delete(songId);
             console.log(`[Cache] Cancelled download for: ${songId}`);
         }
     },
@@ -160,6 +183,7 @@ export const CacheManager = {
             console.log(`[Cache] Cancelled download for: ${songId}`);
         }
         activeDownloads.clear();
+        activeDownloadPromises.clear();
     },
 
     // ---- Internal index methods (LRU) ----
@@ -241,6 +265,8 @@ export const CacheManager = {
      * Check if a specific song is cached (index-based, no disk I/O).
      */
     isCached: async (songId: string): Promise<boolean> => {
+        // A song is considered "cached" if it's in the index OR currently being downloaded
+        if (activeDownloadPromises.has(songId)) return true;
         const index = await CacheManager._getIndex();
         return index.some(e => e.songId === songId);
     },

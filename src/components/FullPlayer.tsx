@@ -17,9 +17,11 @@ import DraggableFlatList, {
 import { Ionicons } from '@expo/vector-icons';
 import { CustomSlider } from './CustomSlider';
 import { usePlayerStore, useThemeStore } from '../store';
+import { useSleepTimerStore } from '../store/sleepTimerStore';
 import { AlbumArt } from './AlbumArt';
 import { ThemeIcon } from './ThemeIcon';
 import { AnimatedBackground } from './AnimatedBackground';
+import { SleepTimerModal } from './SleepTimerModal';
 import { useIsTablet } from '../hooks/useIsTablet';
 import { useLandscape } from '../hooks/useLandscape';
 import { subsonicApi } from '../api/subsonic';
@@ -604,7 +606,9 @@ export const FullPlayer: React.FC<FullPlayerProps> = ({ onClose }) => {
   const [seekPosition, setSeekPosition] = useState(0);
   const [showQueue, setShowQueue] = useState(false);
   const [isImmersive, setIsImmersive] = useState(false);
+  const [showSleepTimer, setShowSleepTimer] = useState(false);
   const { currentTheme } = useThemeStore();
+  const sleepTimerActive = useSleepTimerStore((s) => s.isActive);
   const { isTablet, screenWidth } = useIsTablet();
   const { isLandscape, screenWidth: lsWidth, screenHeight: lsHeight } = useLandscape();
   const artSize = isTablet ? screenWidth * 0.35 : screenWidth * 0.75;
@@ -718,6 +722,13 @@ export const FullPlayer: React.FC<FullPlayerProps> = ({ onClose }) => {
         </TouchableOpacity>
         <Text style={[styles.headerTitle, { color: currentTheme.colors.text }]}>{showQueue ? 'COLA' : 'REPRODUCIENDO'}</Text>
         <View style={styles.headerActions}>
+          <TouchableOpacity style={styles.moreButton} onPress={() => setShowSleepTimer(true)}>
+            <Ionicons
+              name={sleepTimerActive ? 'moon' : 'moon-outline'}
+              size={22}
+              color={sleepTimerActive ? currentTheme.colors.primary : currentTheme.colors.text}
+            />
+          </TouchableOpacity>
           <TouchableOpacity style={styles.moreButton} onPress={() => setIsImmersive(true)}>
             <Ionicons name="expand" size={22} color={currentTheme.colors.text} />
           </TouchableOpacity>
@@ -854,6 +865,12 @@ export const FullPlayer: React.FC<FullPlayerProps> = ({ onClose }) => {
           </View>
         </>
       )}
+
+      {/* Sleep Timer Modal */}
+      <SleepTimerModal
+        visible={showSleepTimer}
+        onClose={() => setShowSleepTimer(false)}
+      />
     </GestureHandlerRootView>
   );
 };

@@ -12,3 +12,4 @@ export { PlaylistAddSongsModal } from './PlaylistAddSongsModal';
 export { PlaylistEditModal } from './PlaylistEditModal';
 export * from './ThemeIcon';
 export { AnimatedBackground } from './AnimatedBackground';
+export { SleepTimerModal } from './SleepTimerModal';
