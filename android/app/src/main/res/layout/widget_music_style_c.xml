@@ -3,7 +3,7 @@
     android:id="@+id/widget_container"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
-    android:background="@drawable/widget_bg_gradient"
+    android:background="@drawable/widget_bg_surface"
     android:padding="16dp">
 
     <LinearLayout
@@ -28,7 +28,7 @@
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
                     android:text="Mad It's My Fault"
-                    android:textColor="#E6FFFFFF"
+                    android:textColor="@color/widget_on_surface"
                     android:textSize="16sp"
                     android:textStyle="bold" />
 
@@ -38,7 +38,7 @@
                     android:layout_height="wrap_content"
                     android:layout_marginTop="2dp"
                     android:text="GRAHAM"
-                    android:textColor="#B3FFFFFF"
+                    android:textColor="@color/widget_on_surface"
                     android:textSize="13sp" />
             </LinearLayout>
 
@@ -67,10 +67,10 @@
                 android:id="@+id/widget_btn_prev"
                 android:layout_width="38dp"
                 android:layout_height="38dp"
-                android:background="@android:color/transparent"
+                android:background="@drawable/widget_tonal_button"
                 android:scaleType="centerInside"
                 android:src="@android:drawable/ic_media_previous"
-                android:tint="#C5EADB" />
+                android:tint="@color/widget_on_surface" />
 
             <ImageButton
                 android:id="@+id/widget_btn_play"
@@ -78,19 +78,19 @@
                 android:layout_height="46dp"
                 android:layout_marginStart="10dp"
                 android:layout_marginEnd="10dp"
-                android:background="@android:color/transparent"
+                android:background="@drawable/widget_primary_button"
                 android:scaleType="centerInside"
                 android:src="@android:drawable/ic_media_play"
-                android:tint="#C5EADB" />
+                android:tint="@android:color/white" />
 
             <ImageButton
                 android:id="@+id/widget_btn_next"
                 android:layout_width="38dp"
                 android:layout_height="38dp"
-                android:background="@android:color/transparent"
+                android:background="@drawable/widget_tonal_button"
                 android:scaleType="centerInside"
                 android:src="@android:drawable/ic_media_next"
-                android:tint="#C5EADB" />
+                android:tint="@color/widget_on_surface" />
         </LinearLayout>
     </LinearLayout>
 

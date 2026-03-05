@@ -3,7 +3,7 @@
     android:id="@+id/widget_container"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
-    android:background="@drawable/widget_bg_pill"
+    android:background="@drawable/widget_bg_surface_pill"
     android:paddingStart="16dp"
     android:paddingEnd="16dp"
     android:paddingTop="8dp"
@@ -26,7 +26,7 @@
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:text="Por Qué Te Vas"
-                android:textColor="#2B1A00"
+                android:textColor="@color/widget_on_surface"
                 android:textSize="15.5sp"
                 android:textStyle="bold" />
 
@@ -36,7 +36,7 @@
                 android:layout_height="wrap_content"
                 android:layout_marginTop="2dp"
                 android:text="TINI, Cali Y El Dandee"
-                android:textColor="#2B1A00"
+                android:textColor="@color/widget_on_surface"
                 android:textSize="12.5sp" />
 
             <ProgressBar
@@ -47,7 +47,7 @@
                 android:layout_marginTop="10dp"
                 android:max="100"
                 android:progress="55"
-                android:progressDrawable="@drawable/widget_progress_yellow" />
+            android:progressDrawable="@drawable/widget_progress_yellow" />
         </LinearLayout>
 
         <LinearLayout
@@ -61,10 +61,10 @@
                 android:id="@+id/widget_btn_prev"
                 android:layout_width="38dp"
                 android:layout_height="38dp"
-                android:background="@android:color/transparent"
+                android:background="@drawable/widget_tonal_button"
                 android:scaleType="centerInside"
                 android:src="@android:drawable/ic_media_previous"
-                android:tint="#2B1A00" />
+                android:tint="@color/widget_on_surface" />
 
             <ImageButton
                 android:id="@+id/widget_btn_play"
@@ -72,19 +72,19 @@
                 android:layout_height="42dp"
                 android:layout_marginStart="8dp"
                 android:layout_marginEnd="8dp"
-                android:background="@android:color/transparent"
+                android:background="@drawable/widget_primary_button"
                 android:scaleType="centerInside"
                 android:src="@android:drawable/ic_media_play"
-                android:tint="#2B1A00" />
+                android:tint="@android:color/white" />
 
             <ImageButton
                 android:id="@+id/widget_btn_next"
                 android:layout_width="38dp"
                 android:layout_height="38dp"
-                android:background="@android:color/transparent"
+                android:background="@drawable/widget_tonal_button"
                 android:scaleType="centerInside"
                 android:src="@android:drawable/ic_media_next"
-                android:tint="#2B1A00" />
+                android:tint="@color/widget_on_surface" />
         </LinearLayout>
     </LinearLayout>
 

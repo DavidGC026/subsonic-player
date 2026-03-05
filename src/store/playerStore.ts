@@ -29,6 +29,8 @@ interface PlayerState {
     duration: number;
     repeatMode: 'none' | 'all' | 'one';
     shuffleMode: boolean;
+    shuffleOrder: string[]; // logical order of IDs for lazy shuffle
+    shufflePointer: number; // pointer in shuffleOrder
     volume: number;
     lastError: string | null;
 }
@@ -128,6 +130,8 @@ export const usePlayerStore = create<PlayerStore>((set, get) => ({
         duration: 0,
         repeatMode: 'none',
         shuffleMode: false,
+        shuffleOrder: [],
+        shufflePointer: 0,
         volume: 1.0,
         lastError: null,
     },
@@ -196,8 +200,6 @@ export const usePlayerStore = create<PlayerStore>((set, get) => ({
                     if (songIndex >= 0 && songIndex !== player.currentIndex) {
                         const newSong = player.queue[songIndex];
 
-                        // Cancel the download for the *previous* song if it was still in flight
-                        // (user skipped quickly)
                         if (lastTriggeredSongId && lastTriggeredSongId !== newSong.id) {
                             CacheManager.cancelDownload(lastTriggeredSongId);
                         }
@@ -208,23 +210,22 @@ export const usePlayerStore = create<PlayerStore>((set, get) => ({
                                 ...state.player,
                                 currentSong: newSong,
                                 currentIndex: songIndex,
+                                shufflePointer: player.shuffleMode
+                                    ? Math.max(0, player.shuffleOrder.findIndex((id) => id === newSong.id))
+                                    : state.player.shufflePointer,
                             },
                         }));
 
-                        // Update Android Widget
                         const isPlaying = get().player.isPlaying;
                         const artworkUrl = CacheManager.getCoverArtUri(newSong.coverArt, subsonicApi.getCoverArtUrl(newSong.coverArt, 600));
                         const primaryColor = useThemeStore.getState().currentTheme.colors.primary;
                         WidgetModule?.updateWidget(newSong.title, newSong.artist, isPlaying, artworkUrl || null, primaryColor);
 
-                        // Auto-advanced to a new track — ensure it's cached (prioritises local)
                         await getResolvedUri(newSong, true);
 
-                        // ── Pre-fetch n+1: silently cache the NEXT song in queue ──
                         const nextIndex = songIndex + 1;
                         if (nextIndex < player.queue.length) {
                             const nextSong = player.queue[nextIndex];
-                            // Check local file directly first — avoids async index lookup
                             const nextLocal = CacheManager.getLocalUri(nextSong.id, nextSong.suffix);
                             if (!nextLocal) {
                                 CacheManager.isCached(nextSong.id).then((alreadyCached) => {
@@ -253,11 +254,64 @@ export const usePlayerStore = create<PlayerStore>((set, get) => ({
                             }
                         }
 
+                        // Lazy shuffle: refill/trim window around new pointer
+                        if (player.shuffleMode) {
+                            const pointer = Math.max(0, player.shuffleOrder.findIndex((id) => id === newSong.id));
+                            const orderedIds = player.shuffleOrder;
+                            // Window sizes and threshold
+                            const start = Math.max(0, pointer - 5);
+                            const end = Math.min(orderedIds.length, pointer + 20 + 1);
+
+                            const ensureWindowLoaded = async () => {
+                                const tpQueue = await TrackPlayer.getQueue();
+                                const existingIds = new Set(tpQueue.map((t) => t.id as string));
+                                const sliceIds = orderedIds.slice(start, end);
+                                for (const id of sliceIds) {
+                                    if (!existingIds.has(id)) {
+                                        const song = player.originalQueue.find((s) => s.id === id);
+                                        if (!song) continue;
+                                        try {
+                                            const uri = await getResolvedUri(song, song.id === newSong.id);
+                                            const track = buildTrack(song, uri);
+                                            await TrackPlayer.add(track);
+                                        } catch (err) {
+                                            console.warn('[Shuffle] no se pudo añadir a ventana', id, err);
+                                        }
+                                    }
+                                }
+                            };
+
+                            const trimWindow = async () => {
+                                const tpQueue = await TrackPlayer.getQueue();
+                                const keepIds = new Set(orderedIds.slice(start, end));
+                                const removeIndexes: number[] = [];
+                                tpQueue.forEach((t, idx) => {
+                                    const id = t.id as string;
+                                    if (!keepIds.has(id)) removeIndexes.push(idx);
+                                });
+                                if (removeIndexes.length > 0) {
+                                    await TrackPlayer.remove(removeIndexes);
+                                }
+                            };
+
+                            const refillIfNeeded = async () => {
+                                const tpQueue = await TrackPlayer.getQueue();
+                                const aheadIds = orderedIds.slice(pointer, Math.min(orderedIds.length, pointer + 20 + 1));
+                                const tpAhead = tpQueue.filter((t) => aheadIds.includes(t.id as string)).length;
+                                if (tpAhead <= 4) {
+                                    await ensureWindowLoaded();
+                                }
+                            };
+
+                            await ensureWindowLoaded();
+                            await trimWindow();
+                            await refillIfNeeded();
+                        }
+
                         setTimeout(() => {
                             subsonicApi.scrobble(newSong.id);
                         }, Math.min(30000, (newSong.duration * 1000) / 2));
 
-                        // Notify sleep timer about the track change
                         handleSleepTimerTrackChange();
                     }
                 }
@@ -548,111 +602,117 @@ export const usePlayerStore = create<PlayerStore>((set, get) => ({
             return;
         }
 
-        const applyShuffleOrder = async (orderedQueue: Song[], newIndex: number) => {
-            try {
-                // Only reorder IDs without rebuilding tracks; relies on TrackPlayer.move
-                const currentTpQueue = await TrackPlayer.getQueue();
-                const idToIndex: Record<string, number> = {};
-                currentTpQueue.forEach((t, idx) => { idToIndex[t.id as string] = idx; });
+        const ensureWindowLoaded = async (orderedIds: string[], pointer: number) => {
+            const start = Math.max(0, pointer - 5);
+            const end = Math.min(orderedIds.length, pointer + 20 + 1);
+            const sliceIds = orderedIds.slice(start, end);
 
-                // Build target order indices to avoid full reset
-                let targetPositions = orderedQueue.map((s) => idToIndex[s.id] ?? -1);
-                // If any track is missing, fall back to minimal rebuild of missing ones only
-                const missing: { song: Song; idx: number }[] = [];
-                targetPositions.forEach((pos, i) => {
-                    if (pos === -1) missing.push({ song: orderedQueue[i], idx: i });
-                });
+            const tpQueue = await TrackPlayer.getQueue();
+            const existingIds = new Set(tpQueue.map((t) => t.id as string));
 
-                if (missing.length > 0) {
-                    // Add missing tracks at end, then move
-                    for (const { song } of missing) {
-                        try {
-                            const uri = await getResolvedUri(song, song.id === currentSong.id);
-                            const track = buildTrack(song, uri);
-                            await TrackPlayer.add(track);
-                            idToIndex[track.id as string] = (await TrackPlayer.getQueue()).length - 1;
-                        } catch (err) {
-                            console.error('[Shuffle] Error añadiendo pista faltante', err);
-                            set((state) => ({ player: { ...state.player, lastError: 'No se pudo reordenar la cola.' } }));
-                            notifyError('No se pudo reordenar la cola.');
-                            return;
-                        }
-                    }
-                    // recompute positions after adds
-                    const refreshed = await TrackPlayer.getQueue();
-                    const refreshedMap: Record<string, number> = {};
-                    refreshed.forEach((t, idx) => { refreshedMap[t.id as string] = idx; });
-                    targetPositions = orderedQueue.map((s) => refreshedMap[s.id] ?? -1);
-                }
-
-                // Move items to match the orderedQueue sequentially
-                // This is O(n^2) in worst case but much cheaper than rebuilding URIs and tracks
-                let currentOrder = [...(await TrackPlayer.getQueue()).map((_t, i) => i)];
-                for (let desiredPos = 0; desiredPos < targetPositions.length; desiredPos++) {
-                    const trackId = orderedQueue[desiredPos].id;
-                    const currentIdx = (await TrackPlayer.getQueue()).findIndex(t => t.id === trackId);
-                    if (currentIdx !== desiredPos && currentIdx >= 0) {
-                        await TrackPlayer.move(currentIdx, desiredPos);
+            for (const id of sliceIds) {
+                if (!existingIds.has(id)) {
+                    const song = player.originalQueue.find((s) => s.id === id);
+                    if (!song) continue;
+                    try {
+                        const uri = await getResolvedUri(song, song.id === currentSong.id);
+                        const track = buildTrack(song, uri);
+                        await TrackPlayer.add(track);
+                    } catch (err) {
+                        console.warn('[Shuffle] no se pudo añadir a ventana', id, err);
                     }
                 }
+            }
+        };
 
-                // Skip to current
-                await TrackPlayer.skip(newIndex);
-                if (player.isPlaying) {
-                    await TrackPlayer.play();
-                }
-            } catch (err) {
-                console.error('[Shuffle] Error reordenando', err);
-                set((state) => ({ player: { ...state.player, lastError: 'No se pudo reordenar la cola.' } }));
-                notifyError('No se pudo reordenar la cola.');
+        const trimWindow = async (orderedIds: string[], pointer: number) => {
+            const tpQueue = await TrackPlayer.getQueue();
+            const keepIds = new Set(
+                orderedIds.slice(
+                    Math.max(0, pointer - 5),
+                    Math.min(orderedIds.length, pointer + 20 + 1)
+                ).map((id) => id)
+            );
+            const removeIndexes: number[] = [];
+            tpQueue.forEach((t, idx) => {
+                const id = t.id as string;
+                if (!keepIds.has(id)) removeIndexes.push(idx);
+            });
+            if (removeIndexes.length > 0) {
+                await TrackPlayer.remove(removeIndexes);
+            }
+        };
+
+        const maybeRefillForward = async (orderedIds: string[], pointer: number) => {
+            const tpQueue = await TrackPlayer.getQueue();
+            const aheadIds = orderedIds.slice(pointer, Math.min(orderedIds.length, pointer + 20 + 1));
+            const tpAhead = tpQueue.filter((t) => aheadIds.includes(t.id as string)).length;
+            if (tpAhead <= 4) {
+                await ensureWindowLoaded(orderedIds, pointer);
             }
         };
 
         if (isNowShuffling) {
             const unplayed = originalQueue.filter(s => s.id !== currentSong.id);
-
-            // Fisher-Yates shuffle
             for (let i = unplayed.length - 1; i > 0; i--) {
                 const j = Math.floor(Math.random() * (i + 1));
                 [unplayed[i], unplayed[j]] = [unplayed[j], unplayed[i]];
             }
+            const orderIds = [currentSong.id, ...unplayed.map(s => s.id)];
+            const pointer = 0;
 
-            const shuffledQueue = [currentSong, ...unplayed];
-            const newIndex = 0;
-
-            applyShuffleOrder(shuffledQueue, newIndex).catch((err) => {
-                console.error('[Shuffle] applyShuffleOrder', err);
-                set((state) => ({ player: { ...state.player, lastError: 'No se pudo activar aleatorio.' } }));
-                notifyError('No se pudo activar aleatorio.');
-            });
+            TrackPlayer.reset()
+                .then(async () => {
+                    await ensureWindowLoaded(orderIds, pointer);
+                    await TrackPlayer.skip(0);
+                    if (player.isPlaying) await TrackPlayer.play();
+                })
+                .catch((err) => {
+                    console.error('[Shuffle] init window', err);
+                    set((state) => ({ player: { ...state.player, lastError: 'No se pudo activar aleatorio.' } }));
+                    notifyError('No se pudo activar aleatorio.');
+                });
 
             set((state) => ({
                 player: {
                     ...state.player,
                     shuffleMode: true,
-                    queue: shuffledQueue,
-                    currentIndex: newIndex
+                    shuffleOrder: orderIds,
+                    shufflePointer: pointer,
+                    queue: state.player.queue,
+                    currentIndex: 0
                 },
             }));
         } else {
             const restoredQueue = [...originalQueue];
             let newIndex = restoredQueue.findIndex(s => s.id === currentSong.id);
-
             if (newIndex === -1) {
                 restoredQueue.unshift(currentSong);
                 newIndex = 0;
             }
 
-            applyShuffleOrder(restoredQueue, newIndex).catch((err) => {
-                console.error('[Shuffle] applyShuffleOrder off', err);
-                set((state) => ({ player: { ...state.player, lastError: 'No se pudo desactivar aleatorio.' } }));
-                notifyError('No se pudo desactivar aleatorio.');
-            });
+            TrackPlayer.reset()
+                .then(async () => {
+                    const tracks = await Promise.all(restoredQueue.map(async (s) => {
+                        const uri = await getResolvedUri(s, s.id === currentSong.id);
+                        return buildTrack(s, uri);
+                    }));
+                    await TrackPlayer.add(tracks);
+                    await TrackPlayer.skip(newIndex);
+                    if (player.isPlaying) await TrackPlayer.play();
+                })
+                .catch((err) => {
+                    console.error('[Shuffle] restore', err);
+                    set((state) => ({ player: { ...state.player, lastError: 'No se pudo desactivar aleatorio.' } }));
+                    notifyError('No se pudo desactivar aleatorio.');
+                });
 
             set((state) => ({
                 player: {
                     ...state.player,
                     shuffleMode: false,
+                    shuffleOrder: [],
+                    shufflePointer: newIndex,
                     queue: restoredQueue,
                     currentIndex: newIndex
                 },
