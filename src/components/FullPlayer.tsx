@@ -89,7 +89,6 @@ const ImmersiveView: React.FC<ImmersiveViewProps> = ({
   const [seekPos, setSeekPos] = useState(0);
 
   const artSize = Math.min(screenWidth, screenHeight) * 0.55;
-  const coverUrl = subsonicApi.getCoverArtUrl(currentSong.coverArt, 1000);
   const isStarred = !!currentSong.starred;
   const primaryColor = currentTheme.colors.primary;
 
@@ -206,19 +205,14 @@ const ImmersiveView: React.FC<ImmersiveViewProps> = ({
         {renderBackground()}
       </View>
 
-      {/* Album art */}
+      {/* Album art as Vinyl Disc */}
       <View style={immersiveStyles.artWrapper}>
-        {coverUrl ? (
-          <Image
-            source={{ uri: coverUrl }}
-            style={[immersiveStyles.coverArt, { width: artSize, height: artSize }]}
-            resizeMode="cover"
-          />
-        ) : (
-          <View style={[immersiveStyles.placeholder, { width: artSize, height: artSize }]}>
-            <Ionicons name="musical-note" size={100} color="rgba(255,255,255,0.2)" />
-          </View>
-        )}
+        <VinylDisc
+          coverArtId={currentSong.coverArt}
+          size={artSize}
+          isPlaying={isPlaying}
+          primaryColor={currentTheme.colors.primary}
+        />
       </View>
 
       {/* Song info (always visible, subtle) */}

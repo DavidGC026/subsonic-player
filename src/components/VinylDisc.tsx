@@ -22,7 +22,6 @@ export const VinylDisc: React.FC<VinylDiscProps> = ({
     primaryColor = '#B22222',
 }) => {
     const spinAnim = useRef(new Animated.Value(0)).current;
-    const animRef = useRef<Animated.CompositeAnimation | null>(null);
 
     // The cover art circle is ~55% of the total disc size
     const coverSize = size * 0.55;
@@ -36,36 +35,21 @@ export const VinylDisc: React.FC<VinylDiscProps> = ({
 
     useEffect(() => {
         if (isPlaying) {
-            // Start or resume spinning
-            animRef.current = Animated.loop(
+            // Start a fresh looping spin from 0
+            spinAnim.setValue(0);
+            const anim = Animated.loop(
                 Animated.timing(spinAnim, {
                     toValue: 1,
-                    duration: 12000, // 12 seconds per revolution for a nice slow spin
+                    duration: 12000, // 12s per revolution
                     easing: Easing.linear,
                     useNativeDriver: true,
-                    isInteraction: false,
                 })
             );
-            animRef.current.start();
-        } else {
-            // Stop the animation but keep the current rotation value
-            if (animRef.current) {
-                animRef.current.stop();
-                animRef.current = null;
-            }
+            anim.start();
+            return () => anim.stop();
         }
-
-        return () => {
-            if (animRef.current) {
-                animRef.current.stop();
-            }
-        };
-    }, [isPlaying, spinAnim]);
-
-    // Reset spin when cover art changes (new song)
-    useEffect(() => {
-        spinAnim.setValue(0);
-    }, [coverArtId]);
+        // When not playing, the animation just stops where it is (cleanup ran)
+    }, [isPlaying, coverArtId, spinAnim]);
 
     const rotation = spinAnim.interpolate({
         inputRange: [0, 1],
@@ -202,18 +186,6 @@ export const VinylDisc: React.FC<VinylDiscProps> = ({
                     ]}
                 />
             </Animated.View>
-
-            {/* Shadow underneath */}
-            <View
-                style={[
-                    styles.shadow,
-                    {
-                        width: size * 0.9,
-                        height: size * 0.08,
-                        bottom: -size * 0.02,
-                    },
-                ]}
-            />
         </View>
     );
 };
@@ -230,7 +202,6 @@ const styles = StyleSheet.create({
     vinylBase: {
         position: 'absolute',
         backgroundColor: '#1a1a1a',
-        // Subtle radial gradient effect via border
         borderWidth: 1,
         borderColor: '#333',
     },
@@ -246,7 +217,6 @@ const styles = StyleSheet.create({
     coverContainer: {
         position: 'absolute',
         overflow: 'hidden',
-        // Subtle border to separate label from vinyl
         borderWidth: 2,
         borderColor: 'rgba(0, 0, 0, 0.3)',
     },
@@ -265,13 +235,7 @@ const styles = StyleSheet.create({
         position: 'absolute',
         borderWidth: StyleSheet.hairlineWidth,
         borderColor: 'rgba(255, 255, 255, 0.04)',
-        // Offset the reflection slightly for realism
         transform: [{ translateX: -2 }, { translateY: -2 }],
-    },
-    shadow: {
-        position: 'absolute',
-        backgroundColor: 'rgba(0, 0, 0, 0.3)',
-        borderRadius: 100,
     },
 });
 
