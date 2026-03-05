@@ -19,6 +19,7 @@ import { CustomSlider } from './CustomSlider';
 import { usePlayerStore, useThemeStore } from '../store';
 import { useSleepTimerStore } from '../store/sleepTimerStore';
 import { AlbumArt } from './AlbumArt';
+import { VinylDisc } from './VinylDisc';
 import { ThemeIcon } from './ThemeIcon';
 import { AnimatedBackground } from './AnimatedBackground';
 import { SleepTimerModal } from './SleepTimerModal';
@@ -810,7 +811,12 @@ export const FullPlayer: React.FC<FullPlayerProps> = ({ onClose }) => {
         <>
           {/* Phone: vertical layout */}
           <View style={styles.artContainer}>
-            <AlbumArt coverArtId={currentSong.coverArt} size={artSize} borderRadius={12} iconSize={80} />
+            <VinylDisc
+              coverArtId={currentSong.coverArt}
+              size={artSize}
+              isPlaying={isPlaying}
+              primaryColor={currentTheme.colors.primary}
+            />
           </View>
 
           <View style={styles.infoContainer}>
