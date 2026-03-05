@@ -40,6 +40,8 @@ class SleepTimerAlarmReceiver : BroadcastReceiver() {
             audioManager.dispatchMediaKeyEvent(upEvent)
 
             Log.i(TAG, "Media pause key dispatched successfully")
+            
+            com.subsonic.player.NotificationHelper.cancelSleepTimerNotification(context)
         }
     }
 }

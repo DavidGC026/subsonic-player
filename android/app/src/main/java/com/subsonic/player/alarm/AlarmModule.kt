@@ -9,6 +9,8 @@ import com.facebook.react.bridge.Promise
 import com.facebook.react.bridge.ReactApplicationContext
 import com.facebook.react.bridge.ReactContextBaseJavaModule
 import com.facebook.react.bridge.ReactMethod
+import android.media.AudioManager
+import com.subsonic.player.NotificationHelper
 
 class AlarmModule(reactContext: ReactApplicationContext) :
     ReactContextBaseJavaModule(reactContext) {
@@ -38,6 +40,8 @@ class AlarmModule(reactContext: ReactApplicationContext) :
             val info = AlarmManager.AlarmClockInfo(epochMs.toLong(), pendingIntent)
             alarmManager.setAlarmClock(info, pendingIntent)
 
+            NotificationHelper.showAlarmNotification(context, epochMs.toLong())
+
             Log.i(NAME, "Alarm clock scheduled at epoch ${epochMs.toLong()}")
             promise.resolve(true)
         } catch (e: Exception) {
@@ -65,6 +69,8 @@ class AlarmModule(reactContext: ReactApplicationContext) :
                 pendingIntent.cancel()
                 Log.i(NAME, "Alarm clock cancelled")
             }
+            
+            NotificationHelper.cancelAlarmNotification(context)
 
             // Also clear any triggered flag if it was pending
             val prefs = context.getSharedPreferences("AlarmPrefs", Context.MODE_PRIVATE)
@@ -84,6 +90,13 @@ class AlarmModule(reactContext: ReactApplicationContext) :
             val triggered = prefs.getBoolean("isAlarmTriggered", false)
             if (triggered) {
                 prefs.edit().putBoolean("isAlarmTriggered", false).apply()
+                NotificationHelper.cancelAlarmNotification(reactApplicationContext)
+
+                val audioManager = reactApplicationContext.getSystemService(Context.AUDIO_SERVICE) as AudioManager
+                val maxVolume = audioManager.getStreamMaxVolume(AudioManager.STREAM_MUSIC)
+                audioManager.setStreamVolume(AudioManager.STREAM_MUSIC, maxVolume, 0)
+                Log.i(NAME, "Volumen maximizado nativamente a \$maxVolume")
+
                 Log.i(NAME, "⏰ PASO 4/4: JS se despertó y leyó el Flag correctamente, confirmando a React Native")
                 promise.resolve(true)
             } else {

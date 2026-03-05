@@ -1,6 +1,6 @@
 import React, { useEffect } from 'react';
 import { StatusBar } from 'expo-status-bar';
-import { StyleSheet, AppState } from 'react-native';
+import { StyleSheet, AppState, Platform, PermissionsAndroid } from 'react-native';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { AppNavigator } from './src/navigation';
 import { CacheManager } from './src/services/CacheManager';
@@ -20,6 +20,13 @@ export default function App() {
         useAlarmStore.getState().checkPendingAlarm();
       }
     });
+
+    // Request Notifications Permission for Android 13+
+    if (Platform.OS === 'android' && Number(Platform.Version) >= 33) {
+      PermissionsAndroid.request(PermissionsAndroid.PERMISSIONS.POST_NOTIFICATIONS)
+        .then((result) => console.log('POST_NOTIFICATIONS:', result))
+        .catch(console.warn);
+    }
 
     // Initialize music cache directory and load downloads
     CacheManager.init()

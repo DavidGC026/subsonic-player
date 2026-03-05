@@ -11,6 +11,7 @@ import com.facebook.react.bridge.Promise
 import com.facebook.react.bridge.ReactApplicationContext
 import com.facebook.react.bridge.ReactContextBaseJavaModule
 import com.facebook.react.bridge.ReactMethod
+import com.subsonic.player.NotificationHelper
 
 /**
  * Native module that exposes AlarmManager-based sleep timer to JS.
@@ -57,6 +58,8 @@ class SleepTimerModule(reactContext: ReactApplicationContext) :
                 expiresAtMs.toLong(),
                 pendingIntent
             )
+            
+            NotificationHelper.showSleepTimerNotification(context, expiresAtMs.toLong())
 
             Log.i(TAG, "Alarm scheduled at epoch ${expiresAtMs.toLong()}")
             promise.resolve(true)
@@ -91,6 +94,8 @@ class SleepTimerModule(reactContext: ReactApplicationContext) :
                 pendingIntent.cancel()
                 Log.i(TAG, "Alarm cancelled")
             }
+
+            NotificationHelper.cancelSleepTimerNotification(context)
 
             promise.resolve(true)
         } catch (e: Exception) {

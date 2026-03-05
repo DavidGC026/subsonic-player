@@ -18,6 +18,7 @@ import expo.modules.ReactNativeHostWrapper
 
 import com.subsonic.player.sleeptimer.SleepTimerPackage
 import com.subsonic.player.alarm.AlarmPackage
+import com.subsonic.player.widget.WidgetPackage
 
 class MainApplication : Application(), ReactApplication {
 
@@ -30,6 +31,7 @@ class MainApplication : Application(), ReactApplication {
               // add(MyReactNativePackage())
               add(SleepTimerPackage())
               add(AlarmPackage())
+              add(WidgetPackage())
             }
 
           override fun getJSMainModuleName(): String = ".expo/.virtual-metro-entry"

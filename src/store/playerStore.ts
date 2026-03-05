@@ -10,6 +10,10 @@ import type { Song } from '../types';
 import { subsonicApi } from '../api/subsonic';
 import { CacheManager } from '../services/CacheManager';
 import { handleSleepTimerTrackChange } from './sleepTimerStore';
+import { useThemeStore } from './themeStore';
+import { NativeModules } from 'react-native';
+
+const { WidgetModule } = NativeModules;
 
 // ---- Types ----
 
@@ -161,6 +165,13 @@ export const usePlayerStore = create<PlayerStore>((set, get) => ({
                 set((state) => ({
                     player: { ...state.player, isPlaying },
                 }));
+
+                const { player } = get();
+                if (player.currentSong) {
+                    const artworkUrl = CacheManager.getCoverArtUri(player.currentSong.coverArt, subsonicApi.getCoverArtUrl(player.currentSong.coverArt, 600));
+                    const primaryColor = useThemeStore.getState().currentTheme.colors.primary;
+                    WidgetModule?.updateWidget(player.currentSong.title, player.currentSong.artist, isPlaying, artworkUrl || null, primaryColor);
+                }
             });
 
             // Listen for track changes
@@ -186,6 +197,12 @@ export const usePlayerStore = create<PlayerStore>((set, get) => ({
                                 currentIndex: songIndex,
                             },
                         }));
+
+                        // Update Android Widget
+                        const isPlaying = get().player.isPlaying;
+                        const artworkUrl = CacheManager.getCoverArtUri(newSong.coverArt, subsonicApi.getCoverArtUrl(newSong.coverArt, 600));
+                        const primaryColor = useThemeStore.getState().currentTheme.colors.primary;
+                        WidgetModule?.updateWidget(newSong.title, newSong.artist, isPlaying, artworkUrl || null, primaryColor);
 
                         // Auto-advanced to a new track — ensure it's cached (prioritises local)
                         await getResolvedUri(newSong, true);
