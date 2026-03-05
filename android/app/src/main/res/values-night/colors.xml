@@ -1,1 +1,7 @@
-<resources/>
+<resources>
+    <color name="colorSurface">#1E1E1E</color>
+    <color name="colorPrimary">#80C6FF</color>
+    <color name="widget_surface">@color/colorSurface</color>
+    <color name="widget_on_surface">#FFFFFFFF</color>
+    <color name="widget_primary">@color/colorPrimary</color>
+</resources>
