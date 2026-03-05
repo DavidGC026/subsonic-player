@@ -12,6 +12,8 @@ import { CacheManager } from '../services/CacheManager';
 import { handleSleepTimerTrackChange } from './sleepTimerStore';
 import { useThemeStore } from './themeStore';
 import { NativeModules } from 'react-native';
+import type { ToastAndroidStatic } from 'react-native';
+import { Alert, Platform, ToastAndroid } from 'react-native';
 
 const { WidgetModule } = NativeModules;
 
@@ -28,6 +30,7 @@ interface PlayerState {
     repeatMode: 'none' | 'all' | 'one';
     shuffleMode: boolean;
     volume: number;
+    lastError: string | null;
 }
 
 interface PlayerStore {
@@ -59,6 +62,7 @@ interface PlayerStore {
 
     // Star (modifies queue state)
     toggleStar: (id: string, type: 'song' | 'album' | 'artist', currentlyStarred: boolean) => Promise<void>;
+    clearError: () => void;
 }
 
 // ---- Helpers ----
@@ -79,6 +83,14 @@ function buildTrack(song: Song, uri: string) {
         duration: song.duration,
         artwork: artworkUrl || undefined,
     };
+}
+
+function notifyError(message: string) {
+    if (Platform.OS === 'android') {
+        (ToastAndroid as ToastAndroidStatic)?.show(message, ToastAndroid.LONG);
+    } else {
+        Alert.alert('Error', message);
+    }
 }
 
 /**
@@ -117,6 +129,7 @@ export const usePlayerStore = create<PlayerStore>((set, get) => ({
         repeatMode: 'none',
         shuffleMode: false,
         volume: 1.0,
+        lastError: null,
     },
     isTrackPlayerReady: false,
 
@@ -218,11 +231,23 @@ export const usePlayerStore = create<PlayerStore>((set, get) => ({
                                     if (!alreadyCached) {
                                         console.log(`[Pre-fetch] Descargando en background: ${nextSong.title}`);
                                         getResolvedUri(nextSong, true)
-                                            .catch((err) => console.warn('[Pre-fetch] Error:', err));
+                                            .catch((err) => {
+                                                console.warn('[Pre-fetch] Error:', err);
+                                                set((state) => ({
+                                                    player: { ...state.player, lastError: 'No se pudo precargar la siguiente canción.' },
+                                                }));
+                                                notifyError('No se pudo precargar la siguiente canción.');
+                                            });
                                     } else {
                                         console.log(`[Pre-fetch] Ya en caché: ${nextSong.title}`);
                                     }
-                                }).catch((err) => console.warn('[Pre-fetch] Check error:', err));
+                                }).catch((err) => {
+                                    console.warn('[Pre-fetch] Check error:', err);
+                                    set((state) => ({
+                                        player: { ...state.player, lastError: 'No se pudo verificar caché de la siguiente canción.' },
+                                    }));
+                                    notifyError('No se pudo verificar caché de la siguiente canción.');
+                                });
                             } else {
                                 console.log(`[Pre-fetch] Ya en local: ${nextSong.title}`);
                             }
@@ -523,22 +548,63 @@ export const usePlayerStore = create<PlayerStore>((set, get) => ({
             return;
         }
 
-        const rebuildTrackPlayer = async (newQueue: Song[], newIndex: number) => {
-            const currentPos = await TrackPlayer.getProgress();
-            await TrackPlayer.reset();
+        const applyShuffleOrder = async (orderedQueue: Song[], newIndex: number) => {
+            try {
+                // Only reorder IDs without rebuilding tracks; relies on TrackPlayer.move
+                const currentTpQueue = await TrackPlayer.getQueue();
+                const idToIndex: Record<string, number> = {};
+                currentTpQueue.forEach((t, idx) => { idToIndex[t.id as string] = idx; });
 
-            const tracks = await Promise.all(newQueue.map(async (s) => {
-                const isCurrentlyPlaying = s.id === currentSong.id;
-                const finalUri = await getResolvedUri(s, isCurrentlyPlaying);
-                return buildTrack(s, finalUri);
-            }));
+                // Build target order indices to avoid full reset
+                let targetPositions = orderedQueue.map((s) => idToIndex[s.id] ?? -1);
+                // If any track is missing, fall back to minimal rebuild of missing ones only
+                const missing: { song: Song; idx: number }[] = [];
+                targetPositions.forEach((pos, i) => {
+                    if (pos === -1) missing.push({ song: orderedQueue[i], idx: i });
+                });
 
-            await TrackPlayer.add(tracks);
-            await TrackPlayer.skip(newIndex);
-            await TrackPlayer.seekTo(currentPos.position);
+                if (missing.length > 0) {
+                    // Add missing tracks at end, then move
+                    for (const { song } of missing) {
+                        try {
+                            const uri = await getResolvedUri(song, song.id === currentSong.id);
+                            const track = buildTrack(song, uri);
+                            await TrackPlayer.add(track);
+                            idToIndex[track.id as string] = (await TrackPlayer.getQueue()).length - 1;
+                        } catch (err) {
+                            console.error('[Shuffle] Error añadiendo pista faltante', err);
+                            set((state) => ({ player: { ...state.player, lastError: 'No se pudo reordenar la cola.' } }));
+                            notifyError('No se pudo reordenar la cola.');
+                            return;
+                        }
+                    }
+                    // recompute positions after adds
+                    const refreshed = await TrackPlayer.getQueue();
+                    const refreshedMap: Record<string, number> = {};
+                    refreshed.forEach((t, idx) => { refreshedMap[t.id as string] = idx; });
+                    targetPositions = orderedQueue.map((s) => refreshedMap[s.id] ?? -1);
+                }
 
-            if (player.isPlaying) {
-                await TrackPlayer.play();
+                // Move items to match the orderedQueue sequentially
+                // This is O(n^2) in worst case but much cheaper than rebuilding URIs and tracks
+                let currentOrder = [...(await TrackPlayer.getQueue()).map((_t, i) => i)];
+                for (let desiredPos = 0; desiredPos < targetPositions.length; desiredPos++) {
+                    const trackId = orderedQueue[desiredPos].id;
+                    const currentIdx = (await TrackPlayer.getQueue()).findIndex(t => t.id === trackId);
+                    if (currentIdx !== desiredPos && currentIdx >= 0) {
+                        await TrackPlayer.move(currentIdx, desiredPos);
+                    }
+                }
+
+                // Skip to current
+                await TrackPlayer.skip(newIndex);
+                if (player.isPlaying) {
+                    await TrackPlayer.play();
+                }
+            } catch (err) {
+                console.error('[Shuffle] Error reordenando', err);
+                set((state) => ({ player: { ...state.player, lastError: 'No se pudo reordenar la cola.' } }));
+                notifyError('No se pudo reordenar la cola.');
             }
         };
 
@@ -554,7 +620,11 @@ export const usePlayerStore = create<PlayerStore>((set, get) => ({
             const shuffledQueue = [currentSong, ...unplayed];
             const newIndex = 0;
 
-            rebuildTrackPlayer(shuffledQueue, newIndex).catch(console.error);
+            applyShuffleOrder(shuffledQueue, newIndex).catch((err) => {
+                console.error('[Shuffle] applyShuffleOrder', err);
+                set((state) => ({ player: { ...state.player, lastError: 'No se pudo activar aleatorio.' } }));
+                notifyError('No se pudo activar aleatorio.');
+            });
 
             set((state) => ({
                 player: {
@@ -573,7 +643,11 @@ export const usePlayerStore = create<PlayerStore>((set, get) => ({
                 newIndex = 0;
             }
 
-            rebuildTrackPlayer(restoredQueue, newIndex).catch(console.error);
+            applyShuffleOrder(restoredQueue, newIndex).catch((err) => {
+                console.error('[Shuffle] applyShuffleOrder off', err);
+                set((state) => ({ player: { ...state.player, lastError: 'No se pudo desactivar aleatorio.' } }));
+                notifyError('No se pudo desactivar aleatorio.');
+            });
 
             set((state) => ({
                 player: {
@@ -724,7 +798,13 @@ export const usePlayerStore = create<PlayerStore>((set, get) => ({
             }
         } catch (error) {
             console.error(`Error toggling star for ${type}:`, error);
+            set((state) => ({ player: { ...state.player, lastError: 'No se pudo actualizar favoritos.' } }));
+            notifyError('No se pudo actualizar favoritos.');
         }
+    },
+
+    clearError: () => {
+        set((state) => ({ player: { ...state.player, lastError: null } }));
     },
 }));
 

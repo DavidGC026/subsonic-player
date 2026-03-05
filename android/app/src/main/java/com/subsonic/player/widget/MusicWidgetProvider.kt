@@ -64,7 +64,9 @@ class MusicWidgetProvider : AppWidgetProvider() {
             coverArtPath: String?,
             primaryColor: String
         ) {
-            val views = RemoteViews(context.packageName, R.layout.widget_music)
+            val layoutId = selectLayoutResource(appWidgetId)
+            val views = RemoteViews(context.packageName, layoutId)
+
             views.setTextViewText(R.id.widget_title, title)
             views.setTextViewText(R.id.widget_artist, artist)
 
@@ -77,6 +79,9 @@ class MusicWidgetProvider : AppWidgetProvider() {
             try {
                 val color = android.graphics.Color.parseColor(primaryColor)
                 views.setInt(R.id.widget_btn_play_bg, "setColorFilter", color)
+                // Optional accent backgrounds per style (ignored if view not present)
+                views.setInt(R.id.widget_container, "setBackgroundColor", android.graphics.Color.TRANSPARENT)
+                views.setInt(R.id.widget_controls_bg, "setColorFilter", color)
             } catch (e: Exception) { }
 
             if (coverArtPath != null) {
@@ -112,6 +117,15 @@ class MusicWidgetProvider : AppWidgetProvider() {
             }
 
             appWidgetManager.updateAppWidget(appWidgetId, views)
+        }
+
+        private fun selectLayoutResource(appWidgetId: Int): Int {
+            return when (appWidgetId % 4) {
+                0 -> R.layout.widget_music_style_a
+                1 -> R.layout.widget_music_style_b
+                2 -> R.layout.widget_music_style_c
+                else -> R.layout.widget_music_style_d
+            }
         }
 
         private fun getPendingIntent(context: Context, action: String): PendingIntent {

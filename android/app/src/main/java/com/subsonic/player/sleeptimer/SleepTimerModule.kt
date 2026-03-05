@@ -58,13 +58,28 @@ class SleepTimerModule(reactContext: ReactApplicationContext) :
                 expiresAtMs.toLong(),
                 pendingIntent
             )
-            
-            NotificationHelper.showSleepTimerNotification(context, expiresAtMs.toLong())
 
             Log.i(TAG, "Alarm scheduled at epoch ${expiresAtMs.toLong()}")
             promise.resolve(true)
         } catch (e: Exception) {
             Log.e(TAG, "Failed to schedule alarm", e)
+            promise.reject("ALARM_ERROR", e.message, e)
+        }
+    }
+
+    /**
+     * Show an always-on sleep timer notification with a chronometer countdown.
+     */
+    @ReactMethod
+    fun showSleepTimerNotification(expiresAtMs: Double, promise: Promise) {
+        try {
+            NotificationHelper.showSleepTimerNotification(
+                reactApplicationContext,
+                expiresAtMs.toLong()
+            )
+            promise.resolve(true)
+        } catch (e: Exception) {
+            Log.e(TAG, "Failed to show sleep timer notification", e)
             promise.reject("ALARM_ERROR", e.message, e)
         }
     }

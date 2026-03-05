@@ -3,6 +3,6 @@
     android:minWidth="250dp"
     android:minHeight="40dp"
     android:updatePeriodMillis="0"
-    android:initialLayout="@layout/widget_music"
+    android:initialLayout="@layout/widget_music_style_a"
     android:resizeMode="horizontal|vertical"
     android:widgetCategory="home_screen" />

@@ -31,6 +31,11 @@ let appStateSubscription: NativeEventSubscription | null = null;
 
 // ── Helpers ────────────────────────────────────────────────────────────
 
+function showNativeNotification(expiresAtMs: number): void {
+    SleepTimerModule?.showSleepTimerNotification(expiresAtMs)
+        .catch((e: any) => console.warn('[SleepTimer] showSleepTimerNotification error:', e));
+}
+
 function clearUiInterval(): void {
     if (uiIntervalId) {
         clearInterval(uiIntervalId);
@@ -180,6 +185,9 @@ export const useSleepTimerStore = create<SleepTimerStore>((set, get) => ({
             scheduleNativeAlarm(expiresAt);
         }
 
+        // Always show a countdown notification (uses chronometer target time)
+        showNativeNotification(expiresAt);
+
         // ── Secondary mechanisms (belt & suspenders) ──
         // Foreground UI countdown
         startUiInterval();
@@ -214,9 +222,12 @@ export const useSleepTimerStore = create<SleepTimerStore>((set, get) => ({
                     // "Finish current song" turned ON → cancel native alarm
                     // (we'll handle it via track change in JS)
                     cancelNativeAlarm();
+                    // Keep the notification active for the countdown
+                    showNativeNotification(state.expiresAt);
                 } else {
                     // "Finish current song" turned OFF → schedule native alarm
                     scheduleNativeAlarm(state.expiresAt);
+                    showNativeNotification(state.expiresAt);
                 }
             }
 
