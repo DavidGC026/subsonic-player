@@ -52,7 +52,7 @@ export const TVHomeScreen = ({ navigation }: any) => {
                 </View>
                 <MenuButton id="home" icon="home" label="Inicio" />
                 <MenuButton id="search" icon="search" label="Buscar" onPress={() => navigation.navigate('TVSearch')} />
-                <MenuButton id="library" icon="library" label="Biblioteca" />
+                <MenuButton id="library" icon="library" label="Biblioteca" onPress={() => navigation.navigate('TVLibrary')} />
 
                 {/* Show Now Playing icon if there is an active song */}
                 {player.currentSong && (
@@ -118,7 +118,7 @@ export const TVHomeScreen = ({ navigation }: any) => {
                 <Text style={[styles.sectionTitle, { color: colors.text }]}>Agregados Recientemente</Text>
                 <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.horizontalRow}>
                     {albums.slice(0, 15).map((album) => (
-                        <FocusableWrapper key={album.id} onPress={() => { }}>
+                        <FocusableWrapper key={album.id} onPress={() => navigation.navigate('TVAlbumDetail', { albumId: album.id, albumName: album.name })}>
                             <View pointerEvents="none">
                                 <AlbumCard
                                     album={album}
@@ -134,7 +134,7 @@ export const TVHomeScreen = ({ navigation }: any) => {
                 <Text style={[styles.sectionTitle, { color: colors.text }]}>Artistas Populares</Text>
                 <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.horizontalRow}>
                     {artists.slice(0, 10).map((artist) => (
-                        <FocusableWrapper key={artist.id} onPress={() => { }}>
+                        <FocusableWrapper key={artist.id} onPress={() => navigation.navigate('TVArtistDetail', { artistId: artist.id, artistName: artist.name })}>
                             <View pointerEvents="none">
                                 <ArtistCard
                                     artist={artist}

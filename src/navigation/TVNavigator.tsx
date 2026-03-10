@@ -10,6 +10,9 @@ import { TVHomeScreen } from '../screens/tv/TVHomeScreen';
 import { TVPlayerScreen } from '../screens/tv/TVPlayerScreen';
 import { TVSearchScreen } from '../screens/tv/TVSearchScreen';
 import { TVConnectScreen } from '../screens/tv/TVConnectScreen';
+import { TVAlbumDetailScreen } from '../screens/tv/TVAlbumDetailScreen';
+import { TVArtistDetailScreen } from '../screens/tv/TVArtistDetailScreen';
+import { TVLibraryScreen } from '../screens/tv/TVLibraryScreen';
 
 const Stack = createNativeStackNavigator();
 
@@ -41,6 +44,9 @@ export const TVNavigator: React.FC = () => {
                     <Stack.Screen name="TVHome" component={TVHomeScreen} />
                     <Stack.Screen name="TVSearch" component={TVSearchScreen} />
                     <Stack.Screen name="TVPlayer" component={TVPlayerScreen} />
+                    <Stack.Screen name="TVLibrary" component={TVLibraryScreen} />
+                    <Stack.Screen name="TVAlbumDetail" component={TVAlbumDetailScreen} />
+                    <Stack.Screen name="TVArtistDetail" component={TVArtistDetailScreen} />
                 </>
             ) : (
                 <Stack.Screen name="TVConnect" component={TVConnectScreen} />

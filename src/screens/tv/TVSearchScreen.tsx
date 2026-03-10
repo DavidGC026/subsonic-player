@@ -69,7 +69,7 @@ export const TVSearchScreen = ({ navigation }: any) => {
                 </View>
                 <MenuButton id="home" icon="home" label="Inicio" onPress={() => navigation.navigate('TVHome')} />
                 <MenuButton id="search" icon="search" label="Buscar" onPress={() => { }} />
-                <MenuButton id="library" icon="library" label="Biblioteca" onPress={() => { }} />
+                <MenuButton id="library" icon="library" label="Biblioteca" onPress={() => navigation.navigate('TVLibrary')} />
             </View>
         );
     }
@@ -147,7 +147,7 @@ export const TVSearchScreen = ({ navigation }: any) => {
                                 <Text style={[styles.sectionTitle, { color: colors.text }]}>Álbumes</Text>
                                 <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.horizontalRow}>
                                     {searchResults.albums.map((album) => (
-                                        <FocusableWrapper key={album.id} onPress={() => { }}>
+                                        <FocusableWrapper key={album.id} onPress={() => navigation.navigate('TVAlbumDetail', { albumId: album.id, albumName: album.name })}>
                                             <View pointerEvents="none">
                                                 <AlbumCard album={album} size={220} />
                                             </View>
@@ -163,7 +163,7 @@ export const TVSearchScreen = ({ navigation }: any) => {
                                 <Text style={[styles.sectionTitle, { color: colors.text }]}>Artistas</Text>
                                 <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.horizontalRow}>
                                     {searchResults.artists.map((artist) => (
-                                        <FocusableWrapper key={artist.id} onPress={() => { }}>
+                                        <FocusableWrapper key={artist.id} onPress={() => navigation.navigate('TVArtistDetail', { artistId: artist.id, artistName: artist.name })}>
                                             <View pointerEvents="none">
                                                 <ArtistCard artist={artist} size={180} />
                                             </View>
