@@ -1,35 +1,50 @@
 # Subsonic Player
 
-Una aplicación de música tipo Spotify construida con React Native y Expo que se conecta a servidores Subsonic (Navidrome, Airsonic, etc.).
+Una aplicación de música avanzada construida con React Native que se conecta a servidores Subsonic (Navidrome, Airsonic, etc.), ofreciendo una experiencia moderna, offline y altamente personalizable.
 
-## Características
+## 🌟 Características Principales
 
-- 🎵 **Reproducción de música** - Streaming de audio desde tu servidor Subsonic
-- 🔍 **Búsqueda** - Busca artistas, álbumes y canciones
-- 📚 **Biblioteca** - Explora tu colección de música organizada
-- 🎨 **UI tipo Spotify** - Interfaz oscura y moderna inspirada en Spotify
-- 🔀 **Modo aleatorio** - Reproducción aleatoria de canciones
-- 🔁 **Repetición** - Repite canción, álbum o lista completa
-- 📱 **Controles de reproducción** - Play, pause, siguiente, anterior, seek
-- 🔊 **Control de volumen** - Ajusta el volumen de reproducción
-- 💾 **Persistencia** - Configuración del servidor guardada de forma segura
+### Experiencia Musical Core
+- 🎵 **Reproducción estable** - Streaming de alta calidad mediante `react-native-track-player` (soporte de reproducción en segundo plano y controles en la pantalla de bloqueo).
+- 🔍 **Búsqueda Avanzada** - Busca artistas, álbumes y canciones en toda tu biblioteca.
+- 📚 **Gestión de Biblioteca** - Explora tu colección, guarda álbumes y gestiona playlists.
+- 🔀 **Modos de Reproducción** - Modo aleatorio (shuffle), repetición de canción/lista.
 
-## Servidores Compatibles
+### 🎨 Personalización y UI
+- **Temas Dinámicos** - Múltiples temas a elegir, incluyendo:
+  - Diseño estilo Spotify oscuro/moderno.
+  - *"Starry Night"*: Fondos animados con estrellas en todo el reproductor.
+  - Temas basados en colores acentuados o sólados.
+  - Soporte de transparencias e imagen de fondo (habilidad de mantener temas al usar herramientas como Alarmas).
+- **Widgets Nativos de Android** - Widget en la pantalla de inicio (construido en Kotlin con Jetpack Glance) para controlar la música fácilmente.
+- **Navegación Adaptativa** - Integración fluida con la barra de navegación del sistema y controles de Android.
 
-- [Navidrome](https://www.navidrome.org/)
+### 📶 Modo Offline
+- **Descarga de Canciones y Playlists** - Guarda tu música en caché local para escuchar sin internet.
+- **Detección Automática** - La app detecta si pierdes conexión y cambia automáticamente a la pestaña de descargas.
+- **Reproducción Híbrida** - Reproduce de manera transparente archivos descargados para ahorrar datos aunque estés conectado.
+
+### ⏰ Herramientas Útiles
+- **Sistema de Alarmas Avanzado** - Despierta con tu música (aleatorio de tu librería o una playlist específica).
+  - UI de alarmas estilo "Samsung Clock".
+  - Soporte de múltiples alarmas, con repetición (días específicos), snooze configurable y guardado en base de datos local.
+  - Despierta y salta la pantalla de bloqueo (incluso en Android 14+ con permisos controlados).
+- **Temporizador de Sueño (Sleep Timer)** - Configura el reproductor para apagarse solo usando notificaciones de sistema para rastrear el tiempo restante y poder cancelarlo.
+
+## 📡 Servidores Compatibles
+
+- [Navidrome](https://www.navidrome.org/) (Recomendado)
 - [Airsonic / Airsonic-Advanced](https://airsonic.github.io/)
 - [Subsonic](http://www.subsonic.org/)
-- [Funkwhale](https://funkwhale.audio/) (con API Subsonic)
 - [Gonic](https://github.com/sentriz/gonic)
-- [Ampache](https://ampache.org/) (con API Subsonic)
+- [Funkwhale / Ampache](https://funkwhale.audio/) (usando compatibilidad API Subsonic)
 
-## Instalación
+## 🚀 Instalación y Desarrollo
 
 ### Prerrequisitos
-
 - Node.js 18+
-- Expo CLI
-- Cuenta de Expo (opcional, para builds en la nube)
+- Entorno de desarrollo React Native CLI / Expo Dev Client
+- Android Studio (para desarrollo nativo Kotlin/Java)
 
 ### Pasos
 
@@ -44,126 +59,50 @@ cd subsonic-player
 npm install
 ```
 
-3. Inicia la aplicación:
+3. Compilación e inicio (Android):
 ```bash
+# Iniciar servidor Metro
 npx expo start
+
+# Compilar proyecto en un Emulador/Dispositivo conectado
+npm run android
+# o
+npx expo run:android
 ```
 
-4. Escanea el código QR con la app de Expo Go en tu dispositivo móvil, o presiona:
-   - `a` para abrir en Android emulator
-   - `i` para abrir en iOS simulator
-   - `w` para abrir en navegador web
-
-## Configuración del Servidor
-
-1. Abre la aplicación
-2. Ve a "Configuración del Servidor" (icono de engranaje en Home)
-3. Ingresa los datos de tu servidor:
-   - **URL**: La URL de tu servidor (ej: `https://music.example.com` o `http://192.168.1.100:4533`)
-   - **Usuario**: Tu nombre de usuario
-   - **Contraseña**: Tu contraseña
-   - **Autenticación Legacy**: Actívalo solo si usas un servidor antiguo
-
-4. Presiona "Probar Conexión" para verificar
-5. Presiona "Guardar Configuración"
-
-## Estructura del Proyecto
+## 🛠 Estructura Principal del Proyecto
 
 ```
 subsonic-player/
+├── android/                     # Código Nativo Android (Alarmas, Widgets, Notificaciones)
 ├── src/
-│   ├── api/
-│   │   └── subsonic.ts          # Cliente API para Subsonic
-│   ├── components/
-│   │   ├── AlbumArt.tsx         # Componente de portada
-│   │   ├── AlbumCard.tsx        # Tarjeta de álbum
-│   │   ├── ArtistCard.tsx       # Tarjeta de artista
-│   │   ├── SongItem.tsx         # Item de canción
-│   │   ├── MiniPlayer.tsx       # Mini reproductor
-│   │   └── FullPlayer.tsx       # Reproductor completo
-│   ├── navigation/
-│   │   └── AppNavigator.tsx     # Configuración de navegación
-│   ├── screens/
-│   │   ├── HomeScreen.tsx       # Pantalla principal
-│   │   ├── LibraryScreen.tsx    # Pantalla de biblioteca
-│   │   ├── SearchScreen.tsx     # Pantalla de búsqueda
-│   │   ├── AlbumDetailScreen.tsx # Detalle de álbum
-│   │   ├── ArtistDetailScreen.tsx # Detalle de artista
-│   │   └── ServerConfigScreen.tsx # Configuración de servidor
-│   ├── store/
-│   │   ├── musicStore.ts        # Estado de música (Zustand)
-│   │   └── configStore.ts       # Estado de configuración
-│   ├── types/
-│   │   └── index.ts             # Tipos TypeScript
-│   └── utils/
-│       └── helpers.ts           # Funciones utilitarias
-├── App.tsx                      # Punto de entrada
-├── app.json                     # Configuración de Expo
-├── package.json                 # Dependencias
-└── tsconfig.json               # Configuración de TypeScript
+│   ├── api/                     # Cliente API para Subsonic
+│   ├── components/              # UI compartida (Modales, Reproductor, Listas)
+│   ├── navigation/              # AppNavigator (Tabs y Stacks)
+│   ├── screens/                 # Vistas principales (Home, Library, Player)
+│   ├── services/                # Gestor de caché y descargas
+│   ├── store/                   # Estado de la app (Zustand) dividido por dominio
+│   └── types/                   # Definiciones TypeScript
+└── App.tsx                      # Punto de entrada principal
 ```
 
-## Tecnologías Utilizadas
+## 🛠 Tecnologías Utilizadas
 
-- [React Native](https://reactnative.dev/) - Framework móvil
-- [Expo](https://expo.dev/) - Plataforma de desarrollo
-- [TypeScript](https://www.typescriptlang.org/) - Tipado estático
-- [Zustand](https://github.com/pmndrs/zustand) - Gestión de estado
-- [React Navigation](https://reactnavigation.org/) - Navegación
-- [Expo AV](https://docs.expo.dev/versions/latest/sdk/av/) - Reproducción de audio
-- [Axios](https://axios-http.com/) - Cliente HTTP (a través de fetch)
+- **[React Native] / [Expo]** - Base del Framework Móvil.
+- **[react-native-track-player]** - Motor robusto de reproducción de audio.
+- **[Zustand]** - Gestión de estados (Downloads, Tema, Música, Alarmas).
+- **[Kotlin]** - Todo el código puente nativo personalizado (AlarmModule, Glance Widgets).
+- **[AsyncStorage] / FileSystem** - Para la caché y la base de datos local.
+- **[NetInfo]** - Control y listener de estado de red.
 
-## API Subsonic
+## 🤝 Contribuir
 
-La aplicación implementa los siguientes endpoints de la API Subsonic:
-
-- `ping` - Verificar conexión
-- `getArtists` - Obtener artistas
-- `getAlbumList` - Obtener lista de álbumes
-- `getAlbum` - Obtener detalle de álbum
-- `getArtist` - Obtener detalle de artista
-- `getPlaylists` - Obtener playlists
-- `getPlaylist` - Obtener detalle de playlist
-- `search2` - Buscar contenido
-- `stream` - Stream de audio
-- `getCoverArt` - Obtener portadas
-- `getRandomSongs` - Obtener canciones aleatorias
-- `scrobble` - Registrar reproducción
-
-## Scripts
-
-```bash
-# Iniciar desarrollo
-npx expo start
-
-# Android
-npx expo start --android
-
-# iOS
-npx expo start --ios
-
-# Web
-npx expo start --web
-
-# Build para producción
-npx expo build:android
-npx expo build:ios
-```
-
-## Contribuir
-
-1. Fork el repositorio
+1. Haz un Fork del repositorio
 2. Crea una rama (`git checkout -b feature/nueva-funcionalidad`)
-3. Commit tus cambios (`git commit -am 'Agrega nueva funcionalidad'`)
-4. Push a la rama (`git push origin feature/nueva-funcionalidad`)
-5. Crea un Pull Request
+3. Escribe tu código (asegúrate de seguir el diseño y estándares)
+4. Commit de tus cambios (`git commit -am 'Agrega nueva funcionalidad'`)
+5. Haz Push a la rama (`git push origin feature/nueva-funcionalidad`)
+6. Abre un Pull Request
 
-## Licencia
-
-MIT License - ver [LICENSE](LICENSE) para más detalles.
-
-## Agradecimientos
-
-- Inspirado en la interfaz de Spotify
-- API Subsonic por [subsonic.org](http://www.subsonic.org/)
-- Iconos por [Ionicons](https://ionicons.com/)
+---
+**Nota sobre Permisos (Android 13/14+)**: La aplicación solicita transparentemente permisos críticos de manera interactiva para el correcto funcionamiento de características nativas avanzadas (como *Alarmas Exactas*, *Ignorar optimización de Batería*, y *Pantalla Completa*).
