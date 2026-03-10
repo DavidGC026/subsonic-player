@@ -45,3 +45,6 @@ yarn-error.*
 # Temporary files
 *.log
 *.tmp
+
+#Linux
+subsonic-desktop
