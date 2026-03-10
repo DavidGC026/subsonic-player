@@ -4,7 +4,7 @@ import { StyleSheet, AppState, Platform, PermissionsAndroid } from 'react-native
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { AppNavigator } from './src/navigation';
 import { CacheManager } from './src/services/CacheManager';
-import { useDownloadStore, usePlayerStore, useAlarmStore } from './src/store';
+import { useDownloadStore, usePlayerStore, useAlarmStore, useNetworkStore } from './src/store';
 
 export default function App() {
   useEffect(() => {
@@ -35,8 +35,12 @@ export default function App() {
         console.error('Error initializing cache:', error);
       });
 
+    // Start listening for network connectivity changes
+    const unsubscribeNetwork = useNetworkStore.getState().startListening();
+
     return () => {
       appStateSub.remove();
+      unsubscribeNetwork();
     };
   }, []);
 

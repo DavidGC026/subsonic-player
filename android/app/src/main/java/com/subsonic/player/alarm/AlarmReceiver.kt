@@ -18,12 +18,16 @@ class AlarmReceiver : BroadcastReceiver() {
     }
 
     override fun onReceive(context: Context, intent: Intent) {
-        Log.i("AlarmModule", "⏰ PASO 1/4: Evento de alarma recibido en Receiver (¡Llegó la hora!)")
+        val alarmId = intent.getStringExtra("ALARM_ID") ?: ""
+        Log.i("AlarmModule", "⏰ PASO 1/4: Alarma recibida en Receiver, id=$alarmId")
         
-        // Save flag in SharedPreferences so JS layer can read it via native module
+        // Save flag + alarm ID in SharedPreferences so JS layer can read it
         val prefs = context.getSharedPreferences("AlarmPrefs", Context.MODE_PRIVATE)
-        prefs.edit().putBoolean("isAlarmTriggered", true).apply()
-        Log.i("AlarmModule", "⏰ PASO 2/4: Flag de 'isAlarmTriggered' guardado en disco duro")
+        prefs.edit()
+            .putBoolean("isAlarmTriggered", true)
+            .putString("triggeredAlarmId", alarmId)
+            .apply()
+        Log.i("AlarmModule", "⏰ PASO 2/4: Flag guardado con alarmId=$alarmId")
 
         // Create a high-priority notification channel for the alarm trigger
         createAlarmTriggerChannel(context)

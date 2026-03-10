@@ -13,9 +13,9 @@ import {
 
 import { useIsTablet } from '../hooks/useIsTablet';
 import { Ionicons } from '@expo/vector-icons';
-import { usePlayerStore, useLibraryStore, useConfigStore, useThemeStore } from '../store';
-import { AlbumCard, ArtistCard, AlarmModal } from '../components';
-import type { Album, Artist, Playlist } from '../types';
+import { usePlayerStore, useLibraryStore, useConfigStore, useThemeStore, useDownloadStore, useNetworkStore } from '../store';
+import { AlbumCard, ArtistCard, AlarmModal, SongItem } from '../components';
+import type { Album, Artist, Playlist, Song } from '../types';
 import { subsonicApi } from '../api/subsonic';
 
 interface HomeScreenProps {
@@ -45,6 +45,9 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
   const [showAlarm, setShowAlarm] = useState(false);
   const [currentHour, setCurrentHour] = useState(new Date().getHours());
 
+  const { isOffline } = useNetworkStore();
+  const { downloadedSongs, downloadedPlaylists } = useDownloadStore();
+
   useEffect(() => {
     const interval = setInterval(() => {
       setCurrentHour(new Date().getHours());
@@ -64,11 +67,32 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
   const artistCardSize = getSize(130, 160);
   const playlistCardWidth = getSize(140, 180);
 
+  // Derived offline data
+  const offlineSongs = useMemo(() => {
+    return Object.values(downloadedSongs).map(d => d.song);
+  }, [downloadedSongs]);
+
+  const offlinePlaylistsWithSongs = useMemo(() => {
+    if (!downloadedPlaylists) return [];
+
+    return Object.values(downloadedPlaylists)
+      .map(dp => {
+        // Filter songs in this playlist to only those that are downloaded
+        const availableSongs = dp.songs.filter(s => !!downloadedSongs[s.id]);
+        return {
+          playlist: dp.playlist,
+          songs: availableSongs,
+          downloadedAt: dp.downloadedAt,
+        };
+      })
+      .filter(dp => dp.songs.length > 0); // Only show playlists that have at least 1 downloaded song
+  }, [downloadedPlaylists, downloadedSongs]);
+
   useEffect(() => {
-    if (isConfigured) {
+    if (isConfigured && !isOffline) {
       loadData();
     }
-  }, [isConfigured]);
+  }, [isConfigured, isOffline]);
 
   const loadData = async () => {
     await Promise.all([
@@ -89,10 +113,11 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
   };
 
   const onRefresh = useCallback(async () => {
+    if (isOffline) return;
     setRefreshing(true);
     await loadData();
     setRefreshing(false);
-  }, []);
+  }, [isOffline]);
 
   const handleAlbumPress = (album: Album) => {
     navigation?.navigate('AlbumDetail', { albumId: album.id, albumName: album.name });
@@ -107,11 +132,28 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
   };
 
   const handleQuickPlay = async () => {
+    if (isOffline) {
+      // Play from downloaded songs
+      if (offlineSongs.length > 0) {
+        const shuffled = [...offlineSongs].sort(() => Math.random() - 0.5);
+        playSong(shuffled[0], shuffled);
+      }
+      return;
+    }
     const { subsonicApi } = await import('../api/subsonic');
     const songs = await subsonicApi.getRandomSongs(20);
     if (songs.length > 0) {
       playSong(songs[0], songs);
     }
+  };
+
+  const handleOfflineSongPress = (song: Song) => {
+    playSong(song, offlineSongs);
+  };
+
+  const handleOfflinePlaylistPress = (playlistData: { playlist: Playlist; songs: Song[] }) => {
+    // Navigate to playlist detail — the PlaylistDetailScreen will also handle offline mode
+    navigation?.navigate('PlaylistDetail', { playlistId: playlistData.playlist.id, playlistName: playlistData.playlist.name });
   };
 
   if (!isConfigured) {
@@ -132,6 +174,148 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
     );
   }
 
+  // ---- OFFLINE MODE ----
+  if (isOffline) {
+    return (
+      <ScrollView
+        style={[styles.container, { backgroundColor: currentTheme.colors.background }]}
+      >
+        {/* Header */}
+        <View style={styles.header}>
+          <Text style={[styles.greeting, { color: currentTheme.colors.text }]}>{greeting}</Text>
+          <View style={styles.headerButtons}>
+            <TouchableOpacity
+              style={styles.headerButton}
+              onPress={() => setShowAlarm(true)}
+            >
+              <Ionicons name="alarm-outline" size={24} color={currentTheme.colors.text} />
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={styles.headerButton}
+              onPress={() => navigation?.navigate('Themes')}
+            >
+              <Ionicons name="color-palette-outline" size={24} color={currentTheme.colors.text} />
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={styles.headerButton}
+              onPress={() => navigation?.navigate('ServerConfig')}
+            >
+              <Ionicons name="settings-outline" size={24} color={currentTheme.colors.text} />
+            </TouchableOpacity>
+          </View>
+        </View>
+
+        {/* Offline Banner */}
+        <View style={styles.offlineBanner}>
+          <Ionicons name="cloud-offline-outline" size={18} color="#fff" />
+          <Text style={styles.offlineBannerText}>Sin conexión a internet</Text>
+        </View>
+
+        {/* Quick Actions — only shuffle available offline */}
+        {offlineSongs.length > 0 && (
+          <View style={styles.quickActionsContainer}>
+            <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.quickActionsScroll}>
+              <TouchableOpacity style={[styles.quickAction, { backgroundColor: currentTheme.colors.surface }]} onPress={handleQuickPlay}>
+                <View style={[styles.quickActionIcon, { backgroundColor: currentTheme.colors.background }]}>
+                  <Ionicons name="shuffle" size={24} color={currentTheme.colors.text} />
+                </View>
+                <Text style={[styles.quickActionText, { color: currentTheme.colors.text }]}>Aleatorio</Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                style={[styles.quickAction, { backgroundColor: currentTheme.colors.surface }]}
+                onPress={() => navigation?.navigate('Library', { tab: 'downloads' })}
+              >
+                <View style={[styles.quickActionIcon, { backgroundColor: currentTheme.colors.background }]}>
+                  <Ionicons name="download" size={24} color={currentTheme.colors.text} />
+                </View>
+                <Text style={[styles.quickActionText, { color: currentTheme.colors.text }]}>Descargas</Text>
+              </TouchableOpacity>
+            </ScrollView>
+          </View>
+        )}
+
+        {/* Downloaded Playlists */}
+        {offlinePlaylistsWithSongs.length > 0 && (
+          <View style={styles.section}>
+            <View style={styles.sectionHeader}>
+              <Text style={[styles.sectionTitle, { color: currentTheme.colors.text }]}>Playlists Disponibles</Text>
+            </View>
+
+            <ScrollView
+              horizontal
+              showsHorizontalScrollIndicator={false}
+              contentContainerStyle={styles.horizontalList}
+            >
+              {offlinePlaylistsWithSongs.map((dp, index) => (
+                <TouchableOpacity
+                  key={`offline-pl-${dp.playlist.id}-${index}`}
+                  style={[styles.playlistCard, { backgroundColor: currentTheme.colors.surface }]}
+                  onPress={() => handleOfflinePlaylistPress(dp)}
+                  activeOpacity={0.7}
+                >
+                  {customPlaylistImages[dp.playlist.id] ? (
+                    <Image
+                      source={{ uri: customPlaylistImages[dp.playlist.id] }}
+                      style={styles.playlistCardImage}
+                    />
+                  ) : (
+                    <View style={[styles.playlistCardIcon, { backgroundColor: currentTheme.colors.background }]}>
+                      <Ionicons name="musical-notes" size={28} color={currentTheme.colors.textSecondary} />
+                    </View>
+                  )}
+                  <Text style={[styles.playlistCardName, { color: currentTheme.colors.text }]} numberOfLines={1}>
+                    {dp.playlist.name}
+                  </Text>
+                  <Text style={[styles.playlistCardMeta, { color: currentTheme.colors.textSecondary }]}>
+                    {dp.songs.length} canciones
+                  </Text>
+                </TouchableOpacity>
+              ))}
+            </ScrollView>
+          </View>
+        )}
+
+        {/* Downloaded Songs */}
+        <View style={styles.section}>
+          <View style={styles.sectionHeader}>
+            <Text style={[styles.sectionTitle, { color: currentTheme.colors.text }]}>Canciones Descargadas</Text>
+            <Text style={[styles.seeAll, { color: currentTheme.colors.textSecondary }]}>
+              {offlineSongs.length} canciones
+            </Text>
+          </View>
+
+          {offlineSongs.length > 0 ? (
+            offlineSongs.slice(0, 30).map((song, index) => (
+              <SongItem
+                key={`offline-song-${song.id}-${index}`}
+                song={song}
+                onPress={handleOfflineSongPress}
+                showArt={true}
+                index={index}
+              />
+            ))
+          ) : (
+            <View style={styles.offlineEmpty}>
+              <Ionicons name="download-outline" size={48} color={currentTheme.colors.textSecondary} />
+              <Text style={[styles.offlineEmptyTitle, { color: currentTheme.colors.text }]}>
+                No hay canciones descargadas
+              </Text>
+              <Text style={[styles.offlineEmptySubtitle, { color: currentTheme.colors.textSecondary }]}>
+                Descarga canciones cuando tengas conexión para escucharlas sin internet
+              </Text>
+            </View>
+          )}
+        </View>
+
+        <View style={styles.bottomPadding} />
+
+        {isConfigured && <AlarmModal visible={showAlarm} onClose={() => setShowAlarm(false)} />}
+      </ScrollView>
+    );
+  }
+
+  // ---- ONLINE MODE (original) ----
   return (
     <ScrollView
       style={[styles.container, { backgroundColor: currentTheme.colors.background }]}
@@ -498,6 +682,40 @@ const styles = StyleSheet.create({
   playlistCardMeta: {
     fontSize: 11,
     marginTop: 2,
+  },
+  // Offline styles
+  offlineBanner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#e74c3c',
+    paddingVertical: 10,
+    paddingHorizontal: 16,
+    marginHorizontal: 16,
+    marginBottom: 16,
+    borderRadius: 10,
+    gap: 8,
+  },
+  offlineBannerText: {
+    color: '#fff',
+    fontSize: 14,
+    fontWeight: '600',
+  },
+  offlineEmpty: {
+    alignItems: 'center',
+    paddingVertical: 48,
+    paddingHorizontal: 32,
+  },
+  offlineEmptyTitle: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    marginTop: 16,
+    textAlign: 'center',
+  },
+  offlineEmptySubtitle: {
+    fontSize: 14,
+    marginTop: 8,
+    textAlign: 'center',
   },
 });
 

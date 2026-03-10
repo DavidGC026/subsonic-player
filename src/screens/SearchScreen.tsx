@@ -10,7 +10,7 @@ import {
   ScrollView,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { usePlayerStore, useLibraryStore, useConfigStore, useThemeStore } from '../store';
+import { usePlayerStore, useLibraryStore, useConfigStore, useThemeStore, useNetworkStore } from '../store';
 import { AlbumCard, ArtistCard, SongItem } from '../components';
 import type { Album, Artist, Song } from '../types';
 
@@ -32,6 +32,7 @@ export const SearchScreen: React.FC<SearchScreenProps> = ({ navigation }) => {
   const { playSong } = usePlayerStore();
   const { isConfigured } = useConfigStore();
   const { currentTheme } = useThemeStore();
+  const { isOffline } = useNetworkStore();
 
   const handleSearch = useCallback(async () => {
     if (!query.trim()) return;
@@ -195,9 +196,17 @@ export const SearchScreen: React.FC<SearchScreenProps> = ({ navigation }) => {
         <Text style={[styles.title, { color: currentTheme.colors.text }]}>Buscar</Text>
       </View>
 
+      {/* Offline Banner */}
+      {isOffline && (
+        <View style={styles.offlineBanner}>
+          <Ionicons name="cloud-offline-outline" size={16} color="#fff" />
+          <Text style={styles.offlineBannerText}>Sin conexión a internet — la búsqueda no está disponible</Text>
+        </View>
+      )}
+
       {/* Search Bar */}
       <View style={styles.searchContainer}>
-        <View style={[styles.searchBar, { backgroundColor: currentTheme.colors.surface }]}>
+        <View style={[styles.searchBar, { backgroundColor: currentTheme.colors.surface }, isOffline && { opacity: 0.5 }]}>
           <Ionicons name="search" size={20} color={currentTheme.colors.textSecondary} />
           <TextInput
             style={[styles.searchInput, { color: currentTheme.colors.text }]}
@@ -206,9 +215,10 @@ export const SearchScreen: React.FC<SearchScreenProps> = ({ navigation }) => {
             placeholder="¿Qué quieres escuchar?"
             placeholderTextColor={currentTheme.colors.textSecondary}
             returnKeyType="search"
-            onSubmitEditing={handleSearch}
+            onSubmitEditing={isOffline ? undefined : handleSearch}
             autoCapitalize="none"
             autoCorrect={false}
+            editable={!isOffline}
           />
           {query.length > 0 && (
             <TouchableOpacity onPress={handleClear}>
@@ -220,10 +230,10 @@ export const SearchScreen: React.FC<SearchScreenProps> = ({ navigation }) => {
           style={[
             styles.searchButton,
             { backgroundColor: currentTheme.colors.primary },
-            (!query.trim() || isSearching) && { opacity: 0.5 }
+            (!query.trim() || isSearching || isOffline) && { opacity: 0.5 }
           ]}
           onPress={handleSearch}
-          disabled={!query.trim() || isSearching}
+          disabled={!query.trim() || isSearching || isOffline}
         >
           <Text style={[styles.searchButtonText, { color: currentTheme.colors.black }]}>Buscar</Text>
         </TouchableOpacity>
@@ -231,7 +241,17 @@ export const SearchScreen: React.FC<SearchScreenProps> = ({ navigation }) => {
 
       {/* Results */}
       <View style={styles.resultsContainer}>
-        {renderResults()}
+        {isOffline && !hasSearched ? (
+          <View style={styles.emptyContainer}>
+            <Ionicons name="cloud-offline-outline" size={64} color={currentTheme.colors.textSecondary} />
+            <Text style={[styles.emptyTitle, { color: currentTheme.colors.text }]}>Sin conexión</Text>
+            <Text style={[styles.emptyText, { color: currentTheme.colors.textSecondary }]}>
+              Necesitas conexión a internet para buscar. Tus canciones descargadas están disponibles en la Biblioteca.
+            </Text>
+          </View>
+        ) : (
+          renderResults()
+        )}
       </View>
     </View>
   );
@@ -340,6 +360,24 @@ const styles = StyleSheet.create({
   horizontalItem: {
     paddingHorizontal: 16,
     paddingVertical: 8,
+  },
+  offlineBanner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#e74c3c',
+    paddingVertical: 8,
+    paddingHorizontal: 16,
+    marginHorizontal: 16,
+    marginBottom: 12,
+    borderRadius: 10,
+    gap: 8,
+  },
+  offlineBannerText: {
+    color: '#fff',
+    fontSize: 12,
+    fontWeight: '600',
+    flexShrink: 1,
   },
 });
 

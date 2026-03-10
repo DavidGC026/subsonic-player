@@ -12,17 +12,33 @@ import { Ionicons } from '@expo/vector-icons';
 import { useAlarmStore, usePlayerStore, useThemeStore } from '../store';
 import { subsonicApi } from '../api/subsonic';
 import { AnimatedBackground } from './AnimatedBackground';
+import type { Alarm } from '../store/alarmStore';
 
 const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
 
 export const AlarmRingingScreen: React.FC = () => {
     const isRinging = useAlarmStore(state => state.isRinging);
     const dismissAlarm = useAlarmStore(state => state.dismissAlarm);
+    const snoozeAlarm = useAlarmStore(state => state.snoozeAlarm);
+    const triggeredAlarmId = useAlarmStore(state => state.triggeredAlarmId);
+    const alarms = useAlarmStore(state => state.alarms);
     const currentSong = usePlayerStore(state => state.player.currentSong);
     const { currentTheme } = useThemeStore();
 
     const [currentTime, setCurrentTime] = useState(new Date());
-    const [snoozeMinutes, setSnoozeMinutes] = useState(5);
+    const [localSnoozeMinutes, setLocalSnoozeMinutes] = useState(5);
+
+    // Find the triggered alarm to get its config
+    const triggeredAlarm: Alarm | undefined = useMemo(() => {
+        if (!triggeredAlarmId) return undefined;
+        return alarms.find(a => a.id === triggeredAlarmId);
+    }, [triggeredAlarmId, alarms]);
+
+    useEffect(() => {
+        if (triggeredAlarm?.snoozeMinutes) {
+            setLocalSnoozeMinutes(triggeredAlarm.snoozeMinutes);
+        }
+    }, [triggeredAlarm]);
 
     useEffect(() => {
         if (!isRinging) return;
@@ -60,8 +76,7 @@ export const AlarmRingingScreen: React.FC = () => {
     };
 
     const handleSnooze = () => {
-        // TODO: implement snooze - set a new alarm for now + snoozeMinutes
-        dismissAlarm();
+        snoozeAlarm();
     };
 
     const colors = currentTheme.colors;
@@ -106,7 +121,7 @@ export const AlarmRingingScreen: React.FC = () => {
 
                     {/* Alarm label */}
                     <Text style={[styles.alarmLabel, { color: colors.textSecondary }]}>
-                        Alarma
+                        {triggeredAlarm?.name || 'Alarma'}
                     </Text>
 
                     {/* Album Art */}
@@ -147,31 +162,33 @@ export const AlarmRingingScreen: React.FC = () => {
                     </TouchableOpacity>
 
                     {/* Snooze control */}
-                    <View style={styles.snoozeContainer}>
-                        <TouchableOpacity
-                            style={[styles.snoozeAdjustBtn, { borderColor: colors.textSecondary + '40' }]}
-                            onPress={() => setSnoozeMinutes(Math.max(1, snoozeMinutes - 1))}
-                        >
-                            <Ionicons name="remove" size={20} color={colors.textSecondary} />
-                        </TouchableOpacity>
+                    {(triggeredAlarm?.snoozeEnabled !== false) && (
+                        <View style={styles.snoozeContainer}>
+                            <TouchableOpacity
+                                style={[styles.snoozeAdjustBtn, { borderColor: colors.textSecondary + '40' }]}
+                                onPress={() => setLocalSnoozeMinutes(Math.max(1, localSnoozeMinutes - 1))}
+                            >
+                                <Ionicons name="remove" size={20} color={colors.textSecondary} />
+                            </TouchableOpacity>
 
-                        <TouchableOpacity
-                            style={[styles.snoozeMainBtn, { backgroundColor: colors.surface + '80' }]}
-                            onPress={handleSnooze}
-                            activeOpacity={0.7}
-                        >
-                            <Text style={[styles.snoozeText, { color: colors.text }]}>
-                                Aplazar {snoozeMinutes} min
-                            </Text>
-                        </TouchableOpacity>
+                            <TouchableOpacity
+                                style={[styles.snoozeMainBtn, { backgroundColor: colors.surface + '80' }]}
+                                onPress={handleSnooze}
+                                activeOpacity={0.7}
+                            >
+                                <Text style={[styles.snoozeText, { color: colors.text }]}>
+                                    Aplazar {localSnoozeMinutes} min
+                                </Text>
+                            </TouchableOpacity>
 
-                        <TouchableOpacity
-                            style={[styles.snoozeAdjustBtn, { borderColor: colors.textSecondary + '40' }]}
-                            onPress={() => setSnoozeMinutes(Math.min(30, snoozeMinutes + 1))}
-                        >
-                            <Ionicons name="add" size={20} color={colors.textSecondary} />
-                        </TouchableOpacity>
-                    </View>
+                            <TouchableOpacity
+                                style={[styles.snoozeAdjustBtn, { borderColor: colors.textSecondary + '40' }]}
+                                onPress={() => setLocalSnoozeMinutes(Math.min(30, localSnoozeMinutes + 1))}
+                            >
+                                <Ionicons name="add" size={20} color={colors.textSecondary} />
+                            </TouchableOpacity>
+                        </View>
+                    )}
 
                     {/* Mute icon */}
                     <TouchableOpacity style={styles.muteButton} onPress={() => {/* toggle mute */ }}>

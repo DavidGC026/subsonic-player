@@ -11,7 +11,7 @@ import {
   Alert,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { usePlayerStore, useLibraryStore, useThemeStore, useConfigStore, useDownloadStore } from '../store';
+import { usePlayerStore, useLibraryStore, useThemeStore, useConfigStore, useDownloadStore, useNetworkStore } from '../store';
 import { AlbumCard, ArtistCard, SongItem } from '../components';
 import type { Album, Artist, Song } from '../types';
 import { useIsTablet } from '../hooks/useIsTablet';
@@ -32,7 +32,8 @@ const formatFileSize = (bytes: number): string => {
 };
 
 export const LibraryScreen: React.FC<LibraryScreenProps> = ({ navigation, route }) => {
-  const [activeTab, setActiveTab] = useState<LibraryTab>(route?.params?.tab || 'albums');
+  const { isOffline } = useNetworkStore();
+  const [activeTab, setActiveTab] = useState<LibraryTab>(route?.params?.tab || (isOffline ? 'downloads' : 'albums'));
   const {
     albums,
     artists,
@@ -56,14 +57,21 @@ export const LibraryScreen: React.FC<LibraryScreenProps> = ({ navigation, route 
   const { currentTheme } = useThemeStore();
   const { isTablet, screenWidth, getColumns, getSize } = useIsTablet();
 
+  // Auto-switch to downloads tab when going offline
+  useEffect(() => {
+    if (isOffline && activeTab !== 'downloads') {
+      setActiveTab('downloads');
+    }
+  }, [isOffline]);
+
   const numColumns = getColumns(2, 4);
   const cardSize = getSize(160, 180);
 
   useEffect(() => {
-    if (isConfigured) {
+    if (isConfigured && !isOffline) {
       loadData();
     }
-  }, [isConfigured, activeTab]);
+  }, [isConfigured, activeTab, isOffline]);
 
   const loadData = async () => {
     switch (activeTab) {
@@ -105,10 +113,11 @@ export const LibraryScreen: React.FC<LibraryScreenProps> = ({ navigation, route 
   };
 
   const onRefresh = useCallback(async () => {
+    if (isOffline) return;
     setRefreshing(true);
     await loadData();
     setRefreshing(false);
-  }, [activeTab]);
+  }, [activeTab, isOffline]);
 
   const handleAlbumPress = (album: Album) => {
     navigation?.navigate('AlbumDetail', { albumId: album.id, albumName: album.name });
@@ -394,12 +403,35 @@ export const LibraryScreen: React.FC<LibraryScreenProps> = ({ navigation, route 
     );
   }
 
+  const renderOfflineMessage = () => (
+    <View style={offlineStyles.offlineContainer}>
+      <Ionicons name="cloud-offline-outline" size={48} color={currentTheme.colors.textSecondary} />
+      <Text style={[offlineStyles.offlineTitle, { color: currentTheme.colors.text }]}>Sin conexión a internet</Text>
+      <Text style={[offlineStyles.offlineSubtitle, { color: currentTheme.colors.textSecondary }]}>Ve a la pestaña de Descargas para reproducir música descargada</Text>
+      <TouchableOpacity
+        style={[offlineStyles.goToDownloadsBtn, { backgroundColor: currentTheme.colors.primary }]}
+        onPress={() => setActiveTab('downloads')}
+      >
+        <Ionicons name="download" size={18} color={currentTheme.colors.black} />
+        <Text style={[offlineStyles.goToDownloadsBtnText, { color: currentTheme.colors.black }]}>Ir a Descargas</Text>
+      </TouchableOpacity>
+    </View>
+  );
+
   return (
     <View style={[styles.container, { backgroundColor: currentTheme.colors.background }]}>
       {/* Header */}
       <View style={styles.header}>
         <Text style={[styles.title, { color: currentTheme.colors.text }]}>Tu Biblioteca</Text>
       </View>
+
+      {/* Offline Banner */}
+      {isOffline && (
+        <View style={offlineStyles.offlineBanner}>
+          <Ionicons name="cloud-offline-outline" size={16} color="#fff" />
+          <Text style={offlineStyles.offlineBannerText}>Sin conexión a internet</Text>
+        </View>
+      )}
 
       {/* Tabs */}
       <View style={styles.tabsContainer}>
@@ -418,10 +450,10 @@ export const LibraryScreen: React.FC<LibraryScreenProps> = ({ navigation, route 
 
       {/* Content */}
       <View style={styles.content}>
-        {activeTab === 'albums' && renderAlbums()}
-        {activeTab === 'artists' && renderArtists()}
-        {activeTab === 'songs' && renderSongs()}
-        {activeTab === 'playlists' && renderPlaylists()}
+        {activeTab === 'albums' && (isOffline ? renderOfflineMessage() : renderAlbums())}
+        {activeTab === 'artists' && (isOffline ? renderOfflineMessage() : renderArtists())}
+        {activeTab === 'songs' && (isOffline ? renderOfflineMessage() : renderSongs())}
+        {activeTab === 'playlists' && (isOffline ? renderOfflineMessage() : renderPlaylists())}
         {activeTab === 'downloads' && renderDownloads()}
       </View>
     </View>
@@ -609,6 +641,56 @@ const dlStyles = StyleSheet.create({
     fontSize: 14,
     textAlign: 'center',
     marginTop: 8,
+  },
+});
+
+const offlineStyles = StyleSheet.create({
+  offlineBanner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#e74c3c',
+    paddingVertical: 8,
+    paddingHorizontal: 16,
+    marginHorizontal: 16,
+    marginBottom: 8,
+    borderRadius: 10,
+    gap: 8,
+  },
+  offlineBannerText: {
+    color: '#fff',
+    fontSize: 13,
+    fontWeight: '600',
+  },
+  offlineContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 32,
+  },
+  offlineTitle: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    marginTop: 16,
+    textAlign: 'center',
+  },
+  offlineSubtitle: {
+    fontSize: 14,
+    marginTop: 8,
+    textAlign: 'center',
+  },
+  goToDownloadsBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 20,
+    paddingVertical: 12,
+    borderRadius: 25,
+    marginTop: 20,
+    gap: 8,
+  },
+  goToDownloadsBtnText: {
+    fontSize: 14,
+    fontWeight: '600',
   },
 });
 

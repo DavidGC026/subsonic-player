@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useMemo } from 'react';
 import {
     View,
     Text,
@@ -9,7 +9,7 @@ import {
     Alert,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { usePlayerStore, useLibraryStore, useThemeStore, useModalStore, useDownloadStore } from '../store';
+import { usePlayerStore, useLibraryStore, useThemeStore, useModalStore, useDownloadStore, useNetworkStore } from '../store';
 import { SongItem, PlaylistEditModal, PlaylistAddSongsModal } from '../components';
 import type { Song, Playlist } from '../types';
 import { subsonicApi } from '../api/subsonic';
@@ -33,6 +33,8 @@ export const PlaylistDetailScreen: React.FC<PlaylistDetailScreenProps> = ({ navi
     const { customPlaylistImages, removeSongFromPlaylist } = useLibraryStore();
     const setOptionsModalSong = useModalStore(state => state.setOptionsModalSong);
     const { currentTheme } = useThemeStore();
+    const { isOffline } = useNetworkStore();
+    const { downloadedSongs, downloadedPlaylists } = useDownloadStore();
 
     useEffect(() => {
         loadPlaylistDetails();
@@ -43,9 +45,18 @@ export const PlaylistDetailScreen: React.FC<PlaylistDetailScreenProps> = ({ navi
 
         setIsLoading(true);
         try {
-            const { playlist: playlistData, songs: playlistSongs } = await subsonicApi.getPlaylist(playlistId);
-            setPlaylist(playlistData);
-            setSongs(playlistSongs);
+            if (isOffline) {
+                // When offline, use the downloaded playlist cache
+                const offlinePlaylists = useDownloadStore.getState().downloadedPlaylists;
+                if (offlinePlaylists && offlinePlaylists[playlistId]) {
+                    setPlaylist(offlinePlaylists[playlistId].playlist);
+                    setSongs(offlinePlaylists[playlistId].songs);
+                }
+            } else {
+                const { playlist: playlistData, songs: playlistSongs } = await subsonicApi.getPlaylist(playlistId);
+                setPlaylist(playlistData);
+                setSongs(playlistSongs);
+            }
         } catch (error) {
             console.error('Error loading playlist from API, checking offline cache...', error);
             // Fallback to offline downloaded version if available
@@ -59,21 +70,27 @@ export const PlaylistDetailScreen: React.FC<PlaylistDetailScreenProps> = ({ navi
         }
     };
 
+    // When offline, filter to only downloaded songs
+    const displaySongs = useMemo(() => {
+        if (!isOffline) return songs;
+        return songs.filter(s => !!downloadedSongs[s.id]);
+    }, [songs, isOffline, downloadedSongs]);
+
     const handlePlayAll = () => {
-        if (songs.length > 0) {
-            playSong(songs[0], songs);
+        if (displaySongs.length > 0) {
+            playSong(displaySongs[0], displaySongs);
         }
     };
 
     const handleShufflePlay = () => {
-        if (songs.length > 0) {
-            const shuffled = [...songs].sort(() => Math.random() - 0.5);
+        if (displaySongs.length > 0) {
+            const shuffled = [...displaySongs].sort(() => Math.random() - 0.5);
             playSong(shuffled[0], shuffled);
         }
     };
 
     const handleSongPress = (song: Song) => {
-        playSong(song, songs);
+        playSong(song, displaySongs);
     };
 
     const formatDuration = (seconds: number): string => {
@@ -148,7 +165,7 @@ export const PlaylistDetailScreen: React.FC<PlaylistDetailScreenProps> = ({ navi
     return (
         <View style={[styles.container, { backgroundColor: currentTheme.colors.background }]}>
             <FlatList
-                data={songs}
+                data={displaySongs}
                 keyExtractor={(item, index) => `${item.id}-${index}`}
                 contentContainerStyle={styles.listContent}
                 ListHeaderComponent={
@@ -160,12 +177,14 @@ export const PlaylistDetailScreen: React.FC<PlaylistDetailScreenProps> = ({ navi
                             >
                                 <Ionicons name="arrow-back" size={28} color={currentTheme.colors.text} />
                             </TouchableOpacity>
-                            <TouchableOpacity
-                                style={styles.optionsButton}
-                                onPress={() => setIsEditModalVisible(true)}
-                            >
-                                <Ionicons name="ellipsis-vertical" size={24} color={currentTheme.colors.text} />
-                            </TouchableOpacity>
+                            {!isOffline && (
+                                <TouchableOpacity
+                                    style={styles.optionsButton}
+                                    onPress={() => setIsEditModalVisible(true)}
+                                >
+                                    <Ionicons name="ellipsis-vertical" size={24} color={currentTheme.colors.text} />
+                                </TouchableOpacity>
+                            )}
                         </View>
 
                         <View style={styles.infoContainer}>
@@ -176,9 +195,17 @@ export const PlaylistDetailScreen: React.FC<PlaylistDetailScreenProps> = ({ navi
                                 {playlist?.name || playlistName}
                             </Text>
                             <Text style={[styles.metaInfo, { color: currentTheme.colors.textSecondary }]}>
-                                {playlist?.songCount || songs.length} canciones • {formatDuration(playlist?.duration || 0)}
+                                {displaySongs.length} canciones{isOffline && songs.length !== displaySongs.length ? ` (de ${songs.length})` : ''} • {formatDuration(playlist?.duration || 0)}
                             </Text>
                         </View>
+
+                        {/* Offline Banner */}
+                        {isOffline && (
+                            <View style={offlineStyles.offlineBanner}>
+                                <Ionicons name="cloud-offline-outline" size={16} color="#fff" />
+                                <Text style={offlineStyles.offlineBannerText}>Sin conexión — mostrando solo canciones descargadas</Text>
+                            </View>
+                        )}
 
                         <View style={styles.actionButtons}>
                             <TouchableOpacity
@@ -213,11 +240,24 @@ export const PlaylistDetailScreen: React.FC<PlaylistDetailScreenProps> = ({ navi
                     <SongItem
                         song={item}
                         onPress={handleSongPress}
-                        onOptionsPress={() => handleSongOptions(item, index)}
+                        onOptionsPress={isOffline ? undefined : () => handleSongOptions(item, index)}
                         showArt={true}
                         index={index}
                     />
                 )}
+                ListEmptyComponent={
+                    isOffline ? (
+                        <View style={offlineStyles.emptyContainer}>
+                            <Ionicons name="download-outline" size={48} color={currentTheme.colors.textSecondary} />
+                            <Text style={[offlineStyles.emptyTitle, { color: currentTheme.colors.text }]}>
+                                No hay canciones descargadas en esta playlist
+                            </Text>
+                            <Text style={[offlineStyles.emptySubtitle, { color: currentTheme.colors.textSecondary }]}>
+                                Descarga canciones de esta playlist cuando tengas conexión
+                            </Text>
+                        </View>
+                    ) : undefined
+                }
             />
             <PlaylistEditModal
                 visible={isEditModalVisible}
@@ -342,6 +382,42 @@ const styles = StyleSheet.create({
         fontWeight: 'bold',
         paddingHorizontal: 24,
         marginBottom: 8,
+    },
+});
+
+const offlineStyles = StyleSheet.create({
+    offlineBanner: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'center',
+        backgroundColor: '#e74c3c',
+        paddingVertical: 8,
+        paddingHorizontal: 16,
+        marginHorizontal: 24,
+        marginBottom: 16,
+        borderRadius: 10,
+        gap: 8,
+    },
+    offlineBannerText: {
+        color: '#fff',
+        fontSize: 12,
+        fontWeight: '600',
+    },
+    emptyContainer: {
+        alignItems: 'center',
+        paddingVertical: 48,
+        paddingHorizontal: 32,
+    },
+    emptyTitle: {
+        fontSize: 16,
+        fontWeight: 'bold',
+        marginTop: 16,
+        textAlign: 'center',
+    },
+    emptySubtitle: {
+        fontSize: 13,
+        marginTop: 8,
+        textAlign: 'center',
     },
 });
 
