@@ -6,3 +6,4 @@ export { AlbumDetailScreen } from './AlbumDetailScreen';
 export { ArtistDetailScreen } from './ArtistDetailScreen';
 export { PlaylistDetailScreen } from './PlaylistDetailScreen';
 export { ThemesScreen } from './ThemesScreen';
+export { DevicesScreen } from './DevicesScreen';

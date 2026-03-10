@@ -236,6 +236,18 @@ export const ServerConfigScreen: React.FC<ServerConfigScreenProps> = ({ navigati
               </Text>
             </TouchableOpacity>
           )}
+
+          {serverConfig && (
+            <TouchableOpacity
+              style={[styles.button, { backgroundColor: '#1DB954' }]}
+              onPress={() => navigation?.navigate('Devices')}
+            >
+              <Ionicons name="tv" size={20} color="#ffffff" />
+              <Text style={styles.buttonText}>
+                Vincular Dispositivos (TV)
+              </Text>
+            </TouchableOpacity>
+          )}
         </View>
 
         <View style={styles.infoContainer}>
