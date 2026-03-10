@@ -10,12 +10,8 @@
         android:layout_width="match_parent"
         android:layout_height="match_parent"
         android:alpha="0.25"
-        android:scaleType="centerCrop" />
-
-    <View
-        android:layout_width="match_parent"
-        android:layout_height="match_parent"
-        android:background="@drawable/widget_overlay_scrim" />
+        android:scaleType="centerCrop"
+        android:contentDescription="Widget cover" />
 
     <LinearLayout
         android:layout_width="match_parent"

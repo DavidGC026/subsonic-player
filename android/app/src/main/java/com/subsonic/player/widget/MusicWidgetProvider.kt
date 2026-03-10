@@ -64,7 +64,7 @@ class MusicWidgetProvider : AppWidgetProvider() {
             coverArtPath: String?,
             primaryColor: String
         ) {
-            val layoutId = selectLayoutResource(appWidgetId)
+            val layoutId = selectLayoutResource(context, appWidgetId)
             val views = RemoteViews(context.packageName, layoutId)
 
             views.setTextViewText(R.id.widget_title, title)
@@ -78,10 +78,8 @@ class MusicWidgetProvider : AppWidgetProvider() {
 
             try {
                 val color = android.graphics.Color.parseColor(primaryColor)
-                views.setInt(R.id.widget_btn_play_bg, "setColorFilter", color)
-                // Optional accent backgrounds per style (ignored if view not present)
+                // Apply accent only on elements that exist across layouts
                 views.setInt(R.id.widget_container, "setBackgroundColor", android.graphics.Color.TRANSPARENT)
-                views.setInt(R.id.widget_controls_bg, "setColorFilter", color)
             } catch (e: Exception) { }
 
             if (coverArtPath != null) {
@@ -119,12 +117,21 @@ class MusicWidgetProvider : AppWidgetProvider() {
             appWidgetManager.updateAppWidget(appWidgetId, views)
         }
 
-        private fun selectLayoutResource(appWidgetId: Int): Int {
-            return when (appWidgetId % 4) {
-                0 -> R.layout.widget_music_style_a
-                1 -> R.layout.widget_music_style_b
-                2 -> R.layout.widget_music_style_c
-                else -> R.layout.widget_music_style_d
+        private fun selectLayoutResource(context: Context, appWidgetId: Int): Int {
+            val prefs = context.getSharedPreferences("WidgetPrefs", Context.MODE_PRIVATE)
+            val stylePref = prefs.getString("style", null)
+
+            return when (stylePref) {
+                "style_a" -> R.layout.widget_music_style_a
+                "style_b" -> R.layout.widget_music_style_b
+                "style_c" -> R.layout.widget_music_style_c
+                "style_d" -> R.layout.widget_music_style_d
+                else -> when (appWidgetId % 4) {
+                    0 -> R.layout.widget_music_style_a
+                    1 -> R.layout.widget_music_style_b
+                    2 -> R.layout.widget_music_style_c
+                    else -> R.layout.widget_music_style_d
+                }
             }
         }
 

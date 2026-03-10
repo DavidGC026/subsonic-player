@@ -11,6 +11,7 @@ import { subsonicApi } from '../api/subsonic';
 import { CacheManager } from '../services/CacheManager';
 import { handleSleepTimerTrackChange } from './sleepTimerStore';
 import { useThemeStore } from './themeStore';
+import { useWidgetStore } from './widgetStore';
 import { NativeModules } from 'react-native';
 import type { ToastAndroidStatic } from 'react-native';
 import { Alert, Platform, ToastAndroid } from 'react-native';
@@ -186,8 +187,9 @@ export const usePlayerStore = create<PlayerStore>((set, get) => ({
                 const { player } = get();
                 if (player.currentSong) {
                     const artworkUrl = CacheManager.getCoverArtUri(player.currentSong.coverArt, subsonicApi.getCoverArtUrl(player.currentSong.coverArt, 600));
+                    const widgetStyle = useWidgetStore.getState().widgetStyle;
                     const primaryColor = useThemeStore.getState().currentTheme.colors.primary;
-                    WidgetModule?.updateWidget(player.currentSong.title, player.currentSong.artist, isPlaying, artworkUrl || null, primaryColor);
+                    WidgetModule?.updateWidget(player.currentSong.title, player.currentSong.artist, isPlaying, artworkUrl || null, primaryColor, widgetStyle);
                 }
             });
 
@@ -218,8 +220,9 @@ export const usePlayerStore = create<PlayerStore>((set, get) => ({
 
                         const isPlaying = get().player.isPlaying;
                         const artworkUrl = CacheManager.getCoverArtUri(newSong.coverArt, subsonicApi.getCoverArtUrl(newSong.coverArt, 600));
+                        const widgetStyle = useWidgetStore.getState().widgetStyle;
                         const primaryColor = useThemeStore.getState().currentTheme.colors.primary;
-                        WidgetModule?.updateWidget(newSong.title, newSong.artist, isPlaying, artworkUrl || null, primaryColor);
+                        WidgetModule?.updateWidget(newSong.title, newSong.artist, isPlaying, artworkUrl || null, primaryColor, widgetStyle);
 
                         await getResolvedUri(newSong, true);
 

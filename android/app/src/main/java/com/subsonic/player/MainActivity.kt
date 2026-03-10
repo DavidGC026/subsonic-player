@@ -3,6 +3,7 @@ package com.subsonic.player
 import android.os.Build
 import android.os.Bundle
 import android.content.Intent
+import android.app.KeyguardManager
 import android.view.WindowManager
 
 import com.facebook.react.ReactActivity
@@ -19,16 +20,12 @@ class MainActivity : ReactActivity() {
     // This is required for expo-splash-screen.
     setTheme(R.style.AppTheme);
 
-    // If launched by our alarm, turn screen on and show over lockscreen.
+    // If launched by our alarm, show over lockscreen without dismissing it
     if (intent?.getBooleanExtra("ALARM_TRIGGERED", false) == true) {
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O_MR1) {
-            setShowWhenLocked(true)
-            setTurnScreenOn(true)
-        } else {
-            window.addFlags(WindowManager.LayoutParams.FLAG_SHOW_WHEN_LOCKED or
-                    WindowManager.LayoutParams.FLAG_TURN_SCREEN_ON)
-        }
-        window.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
+        enableLockScreenOverlay()
+    } else {
+        // Not an alarm — ensure lock screen flags are cleared (cleanup from previous alarm)
+        disableLockScreenOverlay()
     }
 
     super.onCreate(null)
@@ -38,15 +35,45 @@ class MainActivity : ReactActivity() {
     super.onNewIntent(intent)
     setIntent(intent)
     if (intent.getBooleanExtra("ALARM_TRIGGERED", false) == true) {
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O_MR1) {
-            setShowWhenLocked(true)
-            setTurnScreenOn(true)
-        } else {
-            window.addFlags(WindowManager.LayoutParams.FLAG_SHOW_WHEN_LOCKED or
-                    WindowManager.LayoutParams.FLAG_TURN_SCREEN_ON)
-        }
-        window.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
+        enableLockScreenOverlay()
     }
+  }
+
+  /**
+   * Show the activity over the lock screen and turn on the screen.
+   * Does NOT dismiss the keyguard — the user sees our alarm UI on top
+   * of the lock screen and can interact with it (dismiss/snooze).
+   */
+  fun enableLockScreenOverlay() {
+      if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O_MR1) {
+          setShowWhenLocked(true)
+          setTurnScreenOn(true)
+      } else {
+          @Suppress("DEPRECATION")
+          window.addFlags(
+              WindowManager.LayoutParams.FLAG_SHOW_WHEN_LOCKED or
+              WindowManager.LayoutParams.FLAG_TURN_SCREEN_ON
+          )
+      }
+      window.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
+  }
+
+  /**
+   * Clear the lock screen overlay flags so the app goes back to normal behavior.
+   * Called from AlarmModule when the user dismisses the alarm.
+   */
+  fun disableLockScreenOverlay() {
+      if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O_MR1) {
+          setShowWhenLocked(false)
+          setTurnScreenOn(false)
+      } else {
+          @Suppress("DEPRECATION")
+          window.clearFlags(
+              WindowManager.LayoutParams.FLAG_SHOW_WHEN_LOCKED or
+              WindowManager.LayoutParams.FLAG_TURN_SCREEN_ON
+          )
+      }
+      window.clearFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
   }
 
   /**

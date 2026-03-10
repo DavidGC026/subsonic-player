@@ -8,6 +8,7 @@ export { useMusicStore } from './musicStore';
 // Other stores
 export { useConfigStore } from './configStore';
 export { useThemeStore, Theme, defaultTheme, spicetifyCatTheme } from './themeStore';
+export { useWidgetStore, type WidgetStyle } from './widgetStore';
 export { useDownloadStore } from './downloadStore';
 export type { DownloadedSong } from './downloadStore';
 export { useModalStore } from './modalStore';

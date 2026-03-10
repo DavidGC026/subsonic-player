@@ -11,7 +11,7 @@ import {
     Platform,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { useThemeStore, Theme, defaultTheme } from '../store';
+import { useThemeStore, Theme, defaultTheme, useWidgetStore, WidgetStyle } from '../store';
 
 interface ThemesScreenProps {
     navigation?: any;
@@ -19,8 +19,42 @@ interface ThemesScreenProps {
 
 export const ThemesScreen: React.FC<ThemesScreenProps> = ({ navigation }) => {
     const { currentTheme, installedThemes, setTheme, installTheme, deleteTheme } = useThemeStore();
+    const { widgetStyle, setWidgetStyle } = useWidgetStore();
     const [themeUrl, setThemeUrl] = useState('');
     const [isDownloading, setIsDownloading] = useState(false);
+
+    const renderWidgetOption = (
+        label: string,
+        value: WidgetStyle,
+        selected: WidgetStyle,
+        onSelect: (style: WidgetStyle) => void,
+        colors: Theme['colors'],
+    ) => {
+        const isActive = value === selected;
+        return (
+            <TouchableOpacity
+                style={[
+                    styles.widgetCard,
+                    {
+                        backgroundColor: colors.surface,
+                        borderColor: isActive ? colors.primary : 'transparent',
+                    },
+                ]}
+                onPress={() => onSelect(value)}
+                activeOpacity={0.9}
+            >
+                <View style={[styles.widgetPreview, { backgroundColor: colors.background }]}>
+                    <View style={[styles.widgetPreviewBar, { backgroundColor: colors.primary }]} />
+                    <View style={[styles.widgetPreviewText, { backgroundColor: colors.text }]} />
+                    <View style={[styles.widgetPreviewText, { backgroundColor: colors.textSecondary, width: '60%' }]} />
+                </View>
+                <View style={styles.widgetLabelRow}>
+                    <Text style={[styles.widgetLabel, { color: colors.text }]}>Estilo {label}</Text>
+                    {isActive && <Ionicons name="checkmark-circle" size={20} color={colors.primary} />}
+                </View>
+            </TouchableOpacity>
+        );
+    };
 
     const handleDownloadTheme = async () => {
         if (!themeUrl.trim()) return;
@@ -121,6 +155,21 @@ export const ThemesScreen: React.FC<ThemesScreenProps> = ({ navigation }) => {
                         <Text style={[styles.sectionTitle, { color: currentTheme.colors.text }]}>
                             Temas Instalados
                         </Text>
+
+                        <View style={styles.widgetSection}>
+                            <Text style={[styles.sectionTitle, { color: currentTheme.colors.text }]}>Widget</Text>
+                            <Text style={[styles.widgetSubtitle, { color: currentTheme.colors.textSecondary }]}>
+                                Elige el diseño que usará tu widget. Se aplica a todas las instancias.
+                            </Text>
+                            <View style={styles.widgetCardRow}>
+                                {renderWidgetOption('A', 'style_a', widgetStyle, setWidgetStyle, currentTheme.colors)}
+                                {renderWidgetOption('B', 'style_b', widgetStyle, setWidgetStyle, currentTheme.colors)}
+                            </View>
+                            <View style={styles.widgetCardRow}>
+                                {renderWidgetOption('C', 'style_c', widgetStyle, setWidgetStyle, currentTheme.colors)}
+                                {renderWidgetOption('D', 'style_d', widgetStyle, setWidgetStyle, currentTheme.colors)}
+                            </View>
+                        </View>
                     </>
                 }
                 ListFooterComponent={
@@ -233,6 +282,51 @@ const styles = StyleSheet.create({
     deleteButton: {
         padding: 8,
         marginLeft: 8,
+    },
+    widgetSection: {
+        marginTop: 8,
+        marginBottom: 24,
+        gap: 12,
+    },
+    widgetSubtitle: {
+        fontSize: 13,
+        marginBottom: 4,
+    },
+    widgetCardRow: {
+        flexDirection: 'row',
+        gap: 12,
+        justifyContent: 'space-between',
+    },
+    widgetCard: {
+        flex: 1,
+        borderRadius: 12,
+        padding: 12,
+        borderWidth: 2,
+    },
+    widgetPreview: {
+        borderRadius: 10,
+        padding: 10,
+        gap: 6,
+    },
+    widgetPreviewBar: {
+        height: 16,
+        borderRadius: 8,
+        width: '50%',
+    },
+    widgetPreviewText: {
+        height: 8,
+        borderRadius: 4,
+        width: '80%',
+    },
+    widgetLabelRow: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+        marginTop: 10,
+    },
+    widgetLabel: {
+        fontSize: 14,
+        fontWeight: '600',
     },
     downloadContainer: {
         marginTop: 32,

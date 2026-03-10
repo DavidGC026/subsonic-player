@@ -1,4 +1,4 @@
-import React, { useEffect, useCallback, useState } from 'react';
+import React, { useEffect, useCallback, useState, useMemo } from 'react';
 import {
   View,
   Text,
@@ -43,6 +43,20 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
   const { isTablet, screenWidth, getSize, getColumns } = useIsTablet();
 
   const [showAlarm, setShowAlarm] = useState(false);
+  const [currentHour, setCurrentHour] = useState(new Date().getHours());
+
+  useEffect(() => {
+    const interval = setInterval(() => {
+      setCurrentHour(new Date().getHours());
+    }, 60000); // Update every minute
+    return () => clearInterval(interval);
+  }, []);
+
+  const greeting = useMemo(() => {
+    if (currentHour >= 5 && currentHour < 12) return 'Buenos días';
+    if (currentHour >= 12 && currentHour < 19) return 'Buenas tardes';
+    return 'Buenas noches';
+  }, [currentHour]);
 
   const gridCols = getColumns(3, 5);
   const gridItemWidth = (screenWidth - 32 - (12 * gridCols)) / gridCols;
@@ -127,7 +141,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
     >
       {/* Header */}
       <View style={styles.header}>
-        <Text style={[styles.greeting, { color: currentTheme.colors.text }]}>Buenos días</Text>
+        <Text style={[styles.greeting, { color: currentTheme.colors.text }]}>{greeting}</Text>
         <View style={styles.headerButtons}>
           <TouchableOpacity
             style={styles.headerButton}
@@ -185,6 +199,52 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
           </TouchableOpacity>
         </ScrollView>
       </View>
+
+      {/* Playlists - First section */}
+      {
+        playlists.length > 0 && (
+          <View style={styles.section}>
+            <View style={styles.sectionHeader}>
+              <Text style={[styles.sectionTitle, { color: currentTheme.colors.text }]}>Tus Playlists</Text>
+              <TouchableOpacity onPress={() => navigation?.navigate('Library', { tab: 'playlists' })}>
+                <Text style={[styles.seeAll, { color: currentTheme.colors.textSecondary }]}>Ver todo</Text>
+              </TouchableOpacity>
+            </View>
+
+            <ScrollView
+              horizontal
+              showsHorizontalScrollIndicator={false}
+              contentContainerStyle={styles.horizontalList}
+            >
+              {playlists.slice(0, 8).map((playlist, index) => (
+                <TouchableOpacity
+                  key={`pl-${playlist.id}-${index}`}
+                  style={[styles.playlistCard, { backgroundColor: currentTheme.colors.surface }]}
+                  onPress={() => handlePlaylistPress(playlist)}
+                  activeOpacity={0.7}
+                >
+                  {customPlaylistImages[playlist.id] ? (
+                    <Image
+                      source={{ uri: customPlaylistImages[playlist.id] }}
+                      style={styles.playlistCardImage}
+                    />
+                  ) : (
+                    <View style={[styles.playlistCardIcon, { backgroundColor: currentTheme.colors.background }]}>
+                      <Ionicons name="musical-notes" size={28} color={currentTheme.colors.textSecondary} />
+                    </View>
+                  )}
+                  <Text style={[styles.playlistCardName, { color: currentTheme.colors.text }]} numberOfLines={1}>
+                    {playlist.name}
+                  </Text>
+                  <Text style={[styles.playlistCardMeta, { color: currentTheme.colors.textSecondary }]}>
+                    {playlist.songCount} canciones
+                  </Text>
+                </TouchableOpacity>
+              ))}
+            </ScrollView>
+          </View>
+        )
+      }
 
       {/* Recent Albums */}
       <View style={styles.section}>
@@ -272,52 +332,6 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
                   onPress={handleAlbumPress}
                   size={albumCardSize}
                 />
-              ))}
-            </ScrollView>
-          </View>
-        )
-      }
-
-      {/* Playlists */}
-      {
-        playlists.length > 0 && (
-          <View style={styles.section}>
-            <View style={styles.sectionHeader}>
-              <Text style={[styles.sectionTitle, { color: currentTheme.colors.text }]}>Tus Playlists</Text>
-              <TouchableOpacity onPress={() => navigation?.navigate('Library', { tab: 'playlists' })}>
-                <Text style={[styles.seeAll, { color: currentTheme.colors.textSecondary }]}>Ver todo</Text>
-              </TouchableOpacity>
-            </View>
-
-            <ScrollView
-              horizontal
-              showsHorizontalScrollIndicator={false}
-              contentContainerStyle={styles.horizontalList}
-            >
-              {playlists.slice(0, 8).map((playlist, index) => (
-                <TouchableOpacity
-                  key={`pl-${playlist.id}-${index}`}
-                  style={[styles.playlistCard, { backgroundColor: currentTheme.colors.surface }]}
-                  onPress={() => handlePlaylistPress(playlist)}
-                  activeOpacity={0.7}
-                >
-                  {customPlaylistImages[playlist.id] ? (
-                    <Image
-                      source={{ uri: customPlaylistImages[playlist.id] }}
-                      style={styles.playlistCardImage}
-                    />
-                  ) : (
-                    <View style={[styles.playlistCardIcon, { backgroundColor: currentTheme.colors.background }]}>
-                      <Ionicons name="musical-notes" size={28} color={currentTheme.colors.textSecondary} />
-                    </View>
-                  )}
-                  <Text style={[styles.playlistCardName, { color: currentTheme.colors.text }]} numberOfLines={1}>
-                    {playlist.name}
-                  </Text>
-                  <Text style={[styles.playlistCardMeta, { color: currentTheme.colors.textSecondary }]}>
-                    {playlist.songCount} canciones
-                  </Text>
-                </TouchableOpacity>
               ))}
             </ScrollView>
           </View>

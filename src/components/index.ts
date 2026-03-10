@@ -15,3 +15,4 @@ export * from './AlarmModal';
 export { AnimatedBackground } from './AnimatedBackground';
 export { SleepTimerModal } from './SleepTimerModal';
 export { VinylDisc } from './VinylDisc';
+export { AlarmRingingScreen } from './AlarmRingingScreen';

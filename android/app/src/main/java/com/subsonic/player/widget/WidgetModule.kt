@@ -25,7 +25,7 @@ class WidgetModule(reactContext: ReactApplicationContext) : ReactContextBaseJava
     override fun getName() = "WidgetModule"
 
     @ReactMethod
-    fun updateWidget(title: String, artist: String, isPlaying: Boolean, coverArtUrl: String?, primaryColor: String?) {
+    fun updateWidget(title: String, artist: String, isPlaying: Boolean, coverArtUrl: String?, primaryColor: String?, style: String?) {
         val context = reactApplicationContext
 
         thread {
@@ -83,6 +83,7 @@ class WidgetModule(reactContext: ReactApplicationContext) : ReactContextBaseJava
                 .putBoolean("isPlaying", isPlaying)
                 .putString("coverArtPath", localPath)
                 .putString("primaryColor", primaryColor)
+                .putString("style", style)
                 .apply()
 
             // Distribute to all instances of the widget

@@ -16,7 +16,7 @@ import {
   ServerConfigScreen,
   ThemesScreen,
 } from '../screens';
-import { MiniPlayer, FullPlayer, SongOptionsModal, PlaylistSelectModal, AnimatedBackground } from '../components';
+import { MiniPlayer, FullPlayer, SongOptionsModal, PlaylistSelectModal, AnimatedBackground, AlarmRingingScreen } from '../components';
 import { usePlayerStore, useLibraryStore, useConfigStore, useThemeStore, useModalStore } from '../store';
 
 // Type definitions
@@ -196,6 +196,9 @@ export const AppNavigator: React.FC = () => {
         songs={playlistModalSongs}
         onClose={() => setPlaylistModalSongs(null)}
       />
+
+      {/* Alarm Ringing Screen */}
+      <AlarmRingingScreen />
     </>
   );
 
